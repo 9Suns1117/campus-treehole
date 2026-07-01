@@ -17,6 +17,7 @@ import java.util.Map;
 public class AuthServlet extends HttpServlet {
 
     private AuthService authService = new AuthServiceImpl();
+    private com.treehole.dao.AuthDao authDao = new com.treehole.dao.AuthDao();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -40,6 +41,8 @@ public class AuthServlet extends HttpServlet {
             register(request, response);
         } else if ("/logout".equals(pathInfo)) {
             logout(request, response);
+        } else if ("/avatar".equals(pathInfo)) {
+            updateAvatar(request, response);
         } else {
             writeJson(response, fail("接口不存在"));
         }
@@ -112,6 +115,37 @@ public class AuthServlet extends HttpServlet {
         writeJson(response, ok("已退出登录"));
     }
 
+    private void updateAvatar(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        TreeholeUser user = (TreeholeUser) request.getSession().getAttribute("loginUser");
+        if (user == null) {
+            writeJson(response, fail("请先登录后再更换头像"));
+            return;
+        }
+
+        Map<String, Object> body = JSON.parseObject(readBody(request), Map.class);
+        Object avatarValue = body == null ? null : body.get("avatarUrl");
+        String avatarUrl = avatarValue == null ? "" : trim(String.valueOf(avatarValue));
+        if (!avatarUrl.isEmpty() && !avatarUrl.startsWith("data:image/")) {
+            writeJson(response, fail("头像只支持图片文件"));
+            return;
+        }
+        if (avatarUrl.length() > 1500 * 1024) {
+            writeJson(response, fail("头像图片不能超过 1.5MB"));
+            return;
+        }
+
+        boolean success = authDao.updateAvatarUrl(user.getUserId(), avatarUrl);
+        if (success) {
+            user.setAvatarUrl(avatarUrl.isEmpty() ? null : avatarUrl);
+            request.getSession(true).setAttribute("loginUser", user);
+            Map<String, Object> result = ok("头像已更新");
+            result.put("user", safeUser(user));
+            writeJson(response, result);
+        } else {
+            writeJson(response, fail("头像更新失败"));
+        }
+    }
+
     private Integer parseRole(String roleText) {
         try {
             return Integer.parseInt(roleText);
@@ -122,6 +156,16 @@ public class AuthServlet extends HttpServlet {
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String readBody(HttpServletRequest request) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        java.io.BufferedReader reader = request.getReader();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            sb.append(line);
+        }
+        return sb.toString();
     }
 
     private Map<String, Object> safeUser(TreeholeUser user) {

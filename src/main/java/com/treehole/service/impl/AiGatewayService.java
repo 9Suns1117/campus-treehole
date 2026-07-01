@@ -49,10 +49,14 @@ public class AiGatewayService {
     }
 
     public String chat(String message) {
+        return chat(message, null);
+    }
+
+    public String chat(String message, JSONArray history) {
         if (message == null || message.trim().isEmpty()) return "你可以先写下一句话，我会接住它。";
         if (!hasApiConfig()) return "AI 接口还没有配置好。请先检查 ai-audit.properties 里的 API 地址、Key 和模型。";
         try {
-            String response = callChatApi(getApiUrl(), getApiKey(), getModel(), getChatPrompt(), trim(message, 1200), 0.7);
+            String response = callChatApi(getApiUrl(), getApiKey(), getModel(), buildChatMessages(getChatPrompt(), history, message), 0.7);
             return parseChatContent(response);
         } catch (Exception e) {
             return "AI 暂时没有接通：" + compact(e.getMessage(), 60);
@@ -99,10 +103,6 @@ public class AiGatewayService {
     }
 
     private String callChatApi(String apiUrl, String apiKey, String model, String systemPrompt, String userText, double temperature) throws Exception {
-        JSONObject payload = new JSONObject();
-        payload.put("model", model);
-        payload.put("temperature", temperature);
-
         JSONArray messages = new JSONArray();
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
@@ -113,6 +113,14 @@ public class AiGatewayService {
         userMessage.put("role", "user");
         userMessage.put("content", userText);
         messages.add(userMessage);
+
+        return callChatApi(apiUrl, apiKey, model, messages, temperature);
+    }
+
+    private String callChatApi(String apiUrl, String apiKey, String model, JSONArray messages, double temperature) throws Exception {
+        JSONObject payload = new JSONObject();
+        payload.put("model", model);
+        payload.put("temperature", temperature);
         payload.put("messages", messages);
 
         URL url = new URL(apiUrl);
@@ -134,6 +142,36 @@ public class AiGatewayService {
         String text = readStream(stream);
         if (code < 200 || code >= 300) throw new RuntimeException("HTTP " + code + " " + compact(text, 180));
         return text;
+    }
+
+    private JSONArray buildChatMessages(String systemPrompt, JSONArray history, String currentMessage) {
+        JSONArray messages = new JSONArray();
+        JSONObject systemMessage = new JSONObject();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", systemPrompt + "\n你可以阅读前文上下文，但不要编造用户没有说过的事实。");
+        messages.add(systemMessage);
+
+        if (history != null) {
+            int start = Math.max(0, history.size() - 10);
+            for (int i = start; i < history.size(); i++) {
+                JSONObject item = history.getJSONObject(i);
+                if (item == null) continue;
+                String role = item.getString("role");
+                String content = item.getString("content");
+                if (!"user".equals(role) && !"assistant".equals(role)) continue;
+                if (content == null || content.trim().isEmpty()) continue;
+                JSONObject message = new JSONObject();
+                message.put("role", role);
+                message.put("content", trim(content, 800));
+                messages.add(message);
+            }
+        }
+
+        JSONObject userMessage = new JSONObject();
+        userMessage.put("role", "user");
+        userMessage.put("content", trim(currentMessage, 1200));
+        messages.add(userMessage);
+        return messages;
     }
 
     private AiAuditResult parseAuditResult(String apiResponse) {

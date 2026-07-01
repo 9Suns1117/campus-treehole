@@ -1,6 +1,8 @@
 package com.treehole.servlet;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.treehole.service.impl.AiGatewayService;
 
 import javax.servlet.ServletException;
@@ -23,14 +25,15 @@ public class AiChatServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         Map<String, Object> result = new HashMap<>();
         try {
-            Map<String, String> body = JSON.parseObject(readBody(request), Map.class);
-            String message = body == null ? "" : body.get("message");
+            JSONObject body = JSON.parseObject(readBody(request));
+            String message = body == null ? "" : body.getString("message");
+            JSONArray history = body == null ? null : body.getJSONArray("history");
             if (message == null || message.trim().isEmpty()) {
                 result.put("success", false);
                 result.put("message", "消息不能为空");
             } else {
                 result.put("success", true);
-                result.put("reply", aiGatewayService.chat(message));
+                result.put("reply", aiGatewayService.chat(message, history));
             }
         } catch (Exception e) {
             e.printStackTrace();

@@ -30,14 +30,32 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    public List<Post> getInteractedPostsByUser(String username) {
+        return postDao.getInteractedPostsByUser(username);
+    }
+
+    @Override
     public boolean publishPost(Post post) {
-        if (post == null) return false;
-        if (post.getBody() == null || post.getBody().trim().length() < 8) return false;
-        if (post.getBody().length() > 520) return false;
-        if (post.getTitle() != null && post.getTitle().length() > 36) return false;
-        post.setAuditStatus(post.getAuditStatus() != null && post.getAuditStatus() == 1 ? 1 : 0);
+        if (!isValidPost(post)) return false;
+        post.setAuditStatus(isValidAuditStatus(post.getAuditStatus()) ? post.getAuditStatus() : 0);
         post.setIsDeleted(0);
         return postDao.insertPost(post);
+    }
+
+    @Override
+    public boolean resubmitPost(Post post) {
+        if (!isValidPost(post)) return false;
+        if (post.getId() == null || post.getId().trim().isEmpty()) return false;
+        if (post.getAuthorUsername() == null || post.getAuthorUsername().trim().isEmpty()) return false;
+        if (!isValidAuditStatus(post.getAuditStatus())) return false;
+
+        Post existing = postDao.getPostById(post.getId());
+        if (existing == null) return false;
+        if (existing.getAuthorUsername() == null || !existing.getAuthorUsername().equals(post.getAuthorUsername())) return false;
+        if (existing.getAuditStatus() == null || existing.getAuditStatus() != 2) return false;
+
+        post.setIsDeleted(0);
+        return postDao.updatePostForResubmission(post);
     }
 
     @Override
@@ -163,5 +181,12 @@ public class PostServiceImpl implements PostService {
 
     private boolean isValidAuditStatus(Integer status) {
         return status != null && (status == 0 || status == 1 || status == 2);
+    }
+
+    private boolean isValidPost(Post post) {
+        if (post == null) return false;
+        if (post.getBody() == null || post.getBody().trim().length() < 8) return false;
+        if (post.getBody().length() > 520) return false;
+        return post.getTitle() == null || post.getTitle().length() <= 36;
     }
 }

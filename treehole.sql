@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS user (
     password VARCHAR(100) NOT NULL,
     nickname VARCHAR(50),
     role INT DEFAULT 1 COMMENT '1: user, 2: admin',
-    avatar_url VARCHAR(255),
+    avatar_url LONGTEXT,
     status INT DEFAULT 1,
     mute_status INT DEFAULT 0 COMMENT '0: normal, 1: muted',
     mute_until DATETIME,
@@ -66,3 +66,4 @@ CREATE TABLE IF NOT EXISTS reply (
 -- ALTER TABLE post ADD COLUMN is_pinned INT DEFAULT 0;
 -- ALTER TABLE user ADD COLUMN mute_status INT DEFAULT 0;
 -- ALTER TABLE user ADD COLUMN mute_until DATETIME;
+-- ALTER TABLE user MODIFY COLUMN avatar_url LONGTEXT;

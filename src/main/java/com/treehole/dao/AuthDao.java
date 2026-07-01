@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.List;
 
 public class AuthDao {
+    private static boolean avatarColumnChecked = false;
 
     public TreeholeUser getUserByUsername(String username) {
         Connection conn = null;
@@ -23,7 +24,7 @@ public class AuthDao {
         try {
             conn = DBUtil.getConnection();
             if (conn == null) return null;
-            ensureUserModerationColumns(conn);
+            ensureUserColumns(conn);
             String sql = "SELECT * FROM user WHERE username = ? AND is_deleted = 0";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, username);
@@ -48,7 +49,7 @@ public class AuthDao {
         try {
             conn = DBUtil.getConnection();
             if (conn == null) return null;
-            ensureUserModerationColumns(conn);
+            ensureUserColumns(conn);
             String sql = "SELECT * FROM user WHERE user_id = ? AND is_deleted = 0";
             pstmt = conn.prepareStatement(sql);
             pstmt.setLong(1, userId);
@@ -72,7 +73,7 @@ public class AuthDao {
         try {
             conn = DBUtil.getConnection();
             if (conn == null) return users;
-            ensureUserModerationColumns(conn);
+            ensureUserColumns(conn);
             String sql = "SELECT * FROM user WHERE is_deleted = 0 ORDER BY role DESC, create_time DESC";
             pstmt = conn.prepareStatement(sql);
             rs = pstmt.executeQuery();
@@ -95,7 +96,7 @@ public class AuthDao {
         try {
             conn = DBUtil.getConnection();
             if (conn == null) return false;
-            ensureUserModerationColumns(conn);
+            ensureUserColumns(conn);
             String sql = "INSERT INTO user (username, password, nickname, role, status, is_deleted) VALUES (?, ?, ?, ?, 1, 0)";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, user.getUsername());
@@ -126,7 +127,7 @@ public class AuthDao {
         try {
             conn = DBUtil.getConnection();
             if (conn == null) return false;
-            ensureUserModerationColumns(conn);
+            ensureUserColumns(conn);
             String sql = "UPDATE user SET mute_status = ?, mute_until = ? WHERE user_id = ? AND is_deleted = 0";
             pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, muteStatus);
@@ -152,7 +153,7 @@ public class AuthDao {
         try {
             conn = DBUtil.getConnection();
             if (conn == null) return false;
-            ensureUserModerationColumns(conn);
+            ensureUserColumns(conn);
             String sql = "UPDATE user SET " + columnName + " = ? WHERE user_id = ? AND is_deleted = 0";
             pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, value);
@@ -175,6 +176,50 @@ public class AuthDao {
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, passwordHash);
             pstmt.setLong(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            DBUtil.close(conn, pstmt, null);
+        }
+    }
+
+    public boolean updateAvatarUrl(Long userId, String avatarUrl) {
+        if (userId == null) return false;
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) return false;
+            ensureUserColumns(conn);
+            String sql = "UPDATE user SET avatar_url = ? WHERE user_id = ? AND is_deleted = 0";
+            pstmt = conn.prepareStatement(sql);
+            if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+                pstmt.setNull(1, java.sql.Types.LONGVARCHAR);
+            } else {
+                pstmt.setString(1, avatarUrl.trim());
+            }
+            pstmt.setLong(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            DBUtil.close(conn, pstmt, null);
+        }
+    }
+
+    public boolean deleteUser(Long userId) {
+        if (userId == null) return false;
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) return false;
+            String sql = "UPDATE user SET is_deleted = 1, status = 0 WHERE user_id = ?";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setLong(1, userId);
             return pstmt.executeUpdate() > 0;
         } catch (Exception e) {
             e.printStackTrace();
@@ -216,7 +261,13 @@ public class AuthDao {
         }
     }
 
-    private void ensureUserModerationColumns(Connection conn) {
+    private void ensureUserColumns(Connection conn) {
+        if (!hasColumn(conn, "user", "avatar_url")) {
+            addColumn(conn, "ALTER TABLE user ADD COLUMN avatar_url LONGTEXT");
+        } else if (!avatarColumnChecked) {
+            avatarColumnChecked = true;
+            addColumn(conn, "ALTER TABLE user MODIFY COLUMN avatar_url LONGTEXT");
+        }
         if (!hasColumn(conn, "user", "mute_status")) {
             addColumn(conn, "ALTER TABLE user ADD COLUMN mute_status INT DEFAULT 0");
         }

@@ -44,6 +44,13 @@ public class PostServlet extends HttpServlet {
                 return;
             }
             writeJson(response, postService.getPostsByAuthor(user.getUsername()));
+        } else if ("/interacted".equals(pathInfo)) {
+            TreeholeUser user = currentUser(request);
+            if (user == null) {
+                writeJson(response, fail("请先登录后再查看互动记录"));
+                return;
+            }
+            writeJson(response, postService.getInteractedPostsByUser(user.getUsername()));
         } else {
             writeJson(response, fail("接口不存在"));
         }
@@ -56,6 +63,8 @@ public class PostServlet extends HttpServlet {
 
         if ("/publish".equals(pathInfo)) {
             publishPost(request, response);
+        } else if ("/resubmit".equals(pathInfo)) {
+            resubmitPost(request, response);
         } else if ("/action".equals(pathInfo)) {
             actionPost(request, response);
         } else if ("/reply".equals(pathInfo)) {
@@ -104,31 +113,74 @@ public class PostServlet extends HttpServlet {
 
             if (!adminPost) {
                 AiAuditResult auditResult = aiGatewayService.auditPost(post.getTitle(), post.getBody(), post.getTags() == null ? "" : post.getTags().toString());
-                if (auditResult != null && auditResult.getStatus() != null && auditResult.getStatus() == 2) {
-                    result.put("success", false);
-                    result.put("message", "AI审核未通过：" + (auditResult.getReason() == null ? "内容不适合展示" : auditResult.getReason()));
-                    writeJson(response, result);
-                    return;
-                }
-                if (auditResult != null && auditResult.getStatus() != null && auditResult.getStatus() == 1) {
-                    post.setAuditStatus(1);
-                    post.setAuditReason(auditResult.getReason());
-                    post.setAuditedBy("AI");
-                    post.setAuditedAt(new Date());
-                } else {
-                    post.setAuditStatus(0);
-                    post.setAuditReason(auditResult == null ? "等待管理员复核" : auditResult.getReason());
-                }
+                applyAiAuditResult(post, auditResult);
             }
 
             boolean success = postService.publishPost(post);
             result.put("success", success);
-            result.put("message", success ? (post.getAuditStatus() != null && post.getAuditStatus() == 1 ? "发布成功，已显示在广场" : "发布成功，等待管理员审核") : "发布失败，请检查内容长度或稍后重试");
+            result.put("message", success ? publishMessage(post) : "发布失败，请检查内容长度或稍后重试");
             result.put("post", post);
         } catch (Exception e) {
             e.printStackTrace();
             result.put("success", false);
             result.put("message", "发布失败");
+        }
+        writeJson(response, result);
+    }
+
+    private void resubmitPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Map<String, Object> result = new HashMap<>();
+        TreeholeUser user = currentUser(request);
+        if (user == null) {
+            writeJson(response, fail("请先登录后再重新提交"));
+            return;
+        }
+        TreeholeUser activeUser = activeUser(user);
+        if (activeUser == null) {
+            writeJson(response, fail("账号已被封禁，无法重新提交"));
+            return;
+        }
+        if (isMuted(activeUser)) {
+            writeJson(response, fail("账号已被禁言，无法重新提交"));
+            return;
+        }
+
+        try {
+            String json = readBody(request);
+            Post post = JSON.parseObject(json, Post.class);
+            if (post == null || post.getId() == null || post.getId().trim().isEmpty()) {
+                writeJson(response, fail("缺少要重新编辑的树洞"));
+                return;
+            }
+
+            post.setAuthorUsername(activeUser.getUsername());
+            post.setAlias(normalizeAlias(post.getAlias()));
+            post.setCreatedAt(new Date());
+            post.setMedia(normalizeMedia(post.getMedia()));
+            post.setReports(0);
+            post.setReportedBy(new ArrayList<String>());
+            post.setIsPinned(0);
+            post.setIsDeleted(0);
+
+            boolean adminPost = activeUser.getRole() != null && activeUser.getRole() == 2;
+            if (adminPost) {
+                post.setAuditStatus(1);
+                post.setAuditReason(null);
+                post.setAuditedBy(activeUser.getUsername());
+                post.setAuditedAt(new Date());
+            } else {
+                AiAuditResult auditResult = aiGatewayService.auditPost(post.getTitle(), post.getBody(), post.getTags() == null ? "" : post.getTags().toString());
+                applyAiAuditResult(post, auditResult);
+            }
+
+            boolean success = postService.resubmitPost(post);
+            result.put("success", success);
+            result.put("message", success ? publishMessage(post) : "重新提交失败，请确认这条树洞仍处于已驳回状态");
+            result.put("post", post);
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "重新提交失败");
         }
         writeJson(response, result);
     }
@@ -211,6 +263,28 @@ public class PostServlet extends HttpServlet {
         if (reply.getAuditStatus() == 1) return "回应成功，AI审核已通过";
         if (reply.getAuditStatus() == 2) return "回应已提交，但AI审核未通过：" + (reply.getAuditReason() == null ? "内容不适合展示" : reply.getAuditReason());
         return "回应成功，AI审核暂未完成，已转入待审核队列";
+    }
+
+    private void applyAiAuditResult(Post post, AiAuditResult auditResult) {
+        if (post == null) return;
+        if (auditResult == null || auditResult.getStatus() == null) {
+            post.setAuditStatus(0);
+            post.setAuditReason("等待管理员复核");
+            post.setAuditedBy(null);
+            post.setAuditedAt(null);
+            return;
+        }
+        post.setAuditStatus(auditResult.getStatus());
+        post.setAuditReason(auditResult.getReason());
+        post.setAuditedBy(auditResult.getStatus() == 0 ? null : "AI");
+        post.setAuditedAt(auditResult.getStatus() == 0 ? null : new Date());
+    }
+
+    private String publishMessage(Post post) {
+        if (post == null || post.getAuditStatus() == null) return "发布成功，等待审核";
+        if (post.getAuditStatus() == 1) return "发布成功，AI审核已通过，已显示在广场";
+        if (post.getAuditStatus() == 2) return "AI审核未通过：" + (post.getAuditReason() == null ? "内容不适合展示" : post.getAuditReason());
+        return "发布成功，AI暂未完成判断，已转入管理员审核";
     }
 
     private TreeholeUser currentUser(HttpServletRequest request) {

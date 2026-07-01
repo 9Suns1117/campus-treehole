@@ -2,6 +2,7 @@
   "use strict";
 
   const DRAFT_KEY = "campus-treehole-draft-v2";
+  const EDIT_POST_KEY = "campus-treehole-edit-post-v1";
   const PREVIEW_POSTS_KEY = "campus-treehole-preview-posts-v1";
   const INTERACTION_SEEN_PREFIX = "campus-treehole-interactions-seen";
 
@@ -71,6 +72,7 @@
     myPostsLoaded: false,
     selectedMedia: [],
     previewPosts: safelyParse(localStorage.getItem(PREVIEW_POSTS_KEY), []),
+    editingPostId: null,
   };
 
   const dom = {
@@ -555,6 +557,7 @@
     }
 
     const post = {
+      id: state.editingPostId || undefined,
       title: title || "匿名碎碎念",
       body,
       category: dom.category.value,
@@ -566,7 +569,7 @@
 
     const submitBtn = dom.form.querySelector("button[type='submit']");
     setButtonLoading(submitBtn, true, "提交中…");
-    fetch(api("/api/posts/publish"), {
+    fetch(api(state.editingPostId ? "/api/posts/resubmit" : "/api/posts/publish"), {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json;charset=UTF-8" },
@@ -582,6 +585,8 @@
           state.selectedMood = "微光";
           dom.moodButtons.forEach((button) => button.classList.toggle("active", button.dataset.mood === "微光"));
           localStorage.removeItem(DRAFT_KEY);
+          localStorage.removeItem(EDIT_POST_KEY);
+          state.editingPostId = null;
           updateCounter();
           loadPosts();
           loadMinePosts();
@@ -591,7 +596,7 @@
         }
       })
       .catch(() => showToast("网络错误，请稍后再试"))
-      .finally(() => setButtonLoading(submitBtn, false, "提交审核"));
+      .finally(() => setButtonLoading(submitBtn, false, state.editingPostId ? "重新提交" : "提交审核"));
   }
 
   function handleFeedClick(event) {
@@ -1072,6 +1077,7 @@
     const text = dom.aiInput.value.trim();
     if (!text) return;
 
+    const history = getAiHistory();
     appendAiMessage("user", text);
     dom.aiInput.value = "";
     appendAiMessage("assistant", "正在接入 AI...");
@@ -1079,7 +1085,7 @@
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json;charset=UTF-8" },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, history }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -1107,6 +1113,17 @@
     if (last && last.classList.contains("assistant") && last.textContent.includes("正在接入")) {
       last.remove();
     }
+  }
+
+  function getAiHistory() {
+    if (!dom.aiMessages) return [];
+    return Array.from(dom.aiMessages.querySelectorAll(".ai-message"))
+      .map((node) => ({
+        role: node.classList.contains("user") ? "user" : "assistant",
+        content: node.textContent.trim(),
+      }))
+      .filter((item) => item.content && !item.content.includes("正在接入"))
+      .slice(-10);
   }
 
   function buildAiReply(text) {
@@ -1225,6 +1242,26 @@
   function restoreDraft() {
     if (!dom.title || !dom.body) return;
     try {
+      const editRaw = localStorage.getItem(EDIT_POST_KEY);
+      if (editRaw) {
+        const editPost = JSON.parse(editRaw);
+        state.editingPostId = editPost.id || null;
+        dom.title.value = editPost.title || "";
+        dom.body.value = editPost.body || "";
+        dom.category.value = editPost.category || "日常";
+        dom.alias.value = editPost.alias || "";
+        dom.tags.value = Array.isArray(editPost.tags) ? editPost.tags.join(" ") : editPost.tags || "";
+        state.selectedMood = editPost.mood || "微光";
+        state.selectedMedia = normalizeMedia(editPost.media);
+        dom.moodButtons.forEach((button) => button.classList.toggle("active", button.dataset.mood === state.selectedMood));
+        renderMediaPreview();
+        const submitBtn = dom.form ? dom.form.querySelector("button[type='submit']") : null;
+        if (submitBtn) submitBtn.lastChild.textContent = "重新提交";
+        updateCounter();
+        showToast("已载入被驳回的树洞，可以修改后重新提交。");
+        return;
+      }
+
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) {
         updateCounter();
@@ -1251,8 +1288,10 @@
     state.selectedMedia = [];
     renderMediaPreview();
     state.selectedMood = "微光";
+    state.editingPostId = null;
     dom.moodButtons.forEach((button) => button.classList.toggle("active", button.dataset.mood === "微光"));
     localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(EDIT_POST_KEY);
     updateCounter();
     showToast("草稿已清空。");
   }

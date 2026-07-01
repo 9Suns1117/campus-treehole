@@ -87,6 +87,8 @@ public class AdminServlet extends HttpServlet {
             success = updateUserStatus(admin, userId, status);
         } else if ("/user/mute".equals(pathInfo)) {
             success = updateUserMuteStatus(admin, userId, muted, durationMinutes);
+        } else if ("/user/delete".equals(pathInfo)) {
+            success = deleteUser(admin, userId);
         } else {
             writeJson(response, fail("接口不存在"));
             return;
@@ -154,6 +156,12 @@ public class AdminServlet extends HttpServlet {
             muteUntil = new Date(System.currentTimeMillis() + durationMinutes.longValue() * 60L * 1000L);
         }
         return authDao.updateUserMuteStatus(userId, muted, muteUntil);
+    }
+
+    private boolean deleteUser(TreeholeUser admin, Long userId) {
+        TreeholeUser target = authDao.getUserById(userId);
+        if (target == null || isSelf(admin, target)) return false;
+        return authDao.deleteUser(userId);
     }
 
     private boolean isSelf(TreeholeUser admin, TreeholeUser target) {
