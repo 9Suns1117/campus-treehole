@@ -56,10 +56,14 @@
               <div>
                 <p class="eyebrow">账号信息</p>
                 <h1 id="profilePageTitle">个人空间</h1>
+                <p class="profile-account-meta" id="profileAccountMeta">正在读取账号…</p>
               </div>
-              <div class="profile-avatar large" id="profileAvatar">你</div>
+              <div class="profile-avatar-wrap">
+                <button class="profile-avatar large" id="profileAvatar" type="button" title="更换头像">你</button>
+                <button class="auth-btn ghost profile-avatar-btn" id="profileAvatarBtn" type="button">更换头像</button>
+                <input id="profileAvatarInput" type="file" accept="image/*" hidden />
+              </div>
             </div>
-            <div class="account-list" id="profileAccountList"></div>
           </section>
 
           <section class="profile-overview-card">
@@ -75,6 +79,10 @@
               <span><b>0</b><i>抱抱</i></span>
               <span><b>0</b><i>回应</i></span>
             </div>
+            <div class="profile-list-tabs" aria-label="个人树洞列表切换">
+              <button class="filter active" type="button" data-profile-tab="mine">发布记录</button>
+              <button class="filter" type="button" data-profile-tab="interacted">点赞 / 抱抱过</button>
+            </div>
             <div class="profile-post-list page-list" id="profilePosts" aria-live="polite"></div>
           </section>
         </section>
@@ -86,6 +94,6 @@
     <script>
       window.CONTEXT_PATH = "${pageContext.request.contextPath}";
     </script>
-    <script src="${pageContext.request.contextPath}/profile.js"></script>
+    <script src="${pageContext.request.contextPath}/profile.js?v=20260701-profile-edit"></script>
   </body>
 </html>
