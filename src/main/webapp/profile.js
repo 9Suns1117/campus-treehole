@@ -1,9 +1,13 @@
 (function () {
   "use strict";
 
+  const EDIT_POST_KEY = "campus-treehole-edit-post-v1";
+
   let loginUser = null;
   const state = {
     posts: [],
+    interactedPosts: [],
+    activeTab: "mine",
   };
 
   const dom = {
@@ -15,9 +19,13 @@
     statHugs: document.getElementById("profileStatHugs"),
     heroCount: document.getElementById("profileHeroCount"),
     avatar: document.getElementById("profileAvatar"),
+    avatarBtn: document.getElementById("profileAvatarBtn"),
+    avatarInput: document.getElementById("profileAvatarInput"),
+    accountMeta: document.getElementById("profileAccountMeta"),
     accountList: document.getElementById("profileAccountList"),
     scoreboard: document.getElementById("profileScoreboard"),
     posts: document.getElementById("profilePosts"),
+    tabButtons: Array.from(document.querySelectorAll("[data-profile-tab]")),
     toast: document.getElementById("toast"),
   };
 
@@ -34,6 +42,17 @@
 
   function bindEvents() {
     if (dom.logoutBtn) dom.logoutBtn.addEventListener("click", logout);
+    if (dom.avatar) dom.avatar.addEventListener("click", pickAvatar);
+    if (dom.avatarBtn) dom.avatarBtn.addEventListener("click", pickAvatar);
+    if (dom.avatarInput) dom.avatarInput.addEventListener("change", handleAvatarChange);
+    if (dom.posts) dom.posts.addEventListener("click", handlePostListClick);
+    dom.tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.activeTab = button.dataset.profileTab || "mine";
+        dom.tabButtons.forEach((item) => item.classList.toggle("active", item === button));
+        renderPosts();
+      });
+    });
   }
 
   function syncCurrentUser() {
@@ -49,6 +68,7 @@
         localStorage.setItem("loginUser", JSON.stringify(data.user));
         renderUserHeader();
         loadMinePosts();
+        loadInteractedPosts();
       })
       .catch(() => {
         showToast("登录状态读取失败，请重新登录。");
@@ -69,10 +89,25 @@
       });
   }
 
+  function loadInteractedPosts() {
+    fetch(api("/api/posts/interacted"), { credentials: "same-origin" })
+      .then((res) => res.json())
+      .then((data) => {
+        state.interactedPosts = normalizePosts(Array.isArray(data) ? data : []);
+        if (state.activeTab === "interacted") renderPosts();
+      })
+      .catch(() => {
+        state.interactedPosts = [];
+      });
+  }
+
   function renderUserHeader() {
     const roleName = Number(loginUser.role) === 2 ? "管理员" : "普通用户";
     dom.userText.textContent = `${roleName}：${loginUser.username}`;
-    dom.avatar.textContent = getAvatarText();
+    renderAvatar();
+    if (dom.accountMeta) {
+      dom.accountMeta.textContent = `${loginUser.nickname || loginUser.username} · @${loginUser.username} · ${roleName}`;
+    }
     if (dom.adminAuditLink) dom.adminAuditLink.style.display = Number(loginUser.role) === 2 ? "inline-flex" : "none";
   }
 
@@ -80,7 +115,7 @@
     const summary = getSummary();
     renderStats(summary);
     renderAccount();
-    renderPosts(summary.posts);
+    renderPosts();
   }
 
   function renderStats(summary) {
@@ -97,6 +132,7 @@
   }
 
   function renderAccount() {
+    if (!dom.accountList) return;
     const accountItems = [
       ["用户名", `@${loginUser.username}`],
       ["昵称", loginUser.nickname || "未设置"],
@@ -112,26 +148,31 @@
       .join("");
   }
 
-  function renderPosts(posts) {
+  function renderPosts() {
+    const posts = state.activeTab === "interacted" ? state.interactedPosts : state.posts;
     if (!posts.length) {
-      dom.posts.innerHTML = `<div class="profile-empty">还没有自己的树洞。回到广场写下一句，这里会替你收好它。</div>`;
+      dom.posts.innerHTML =
+        state.activeTab === "interacted"
+          ? `<div class="profile-empty">还没有点赞或抱抱过的树洞。遇到被你接住的内容，它会出现在这里。</div>`
+          : `<div class="profile-empty">还没有自己的树洞。回到广场写下一句，这里会替你收好它。</div>`;
       return;
     }
-    dom.posts.innerHTML = posts.map(renderProfilePost).join("");
+    dom.posts.innerHTML = posts.map((post) => renderProfilePost(post, state.activeTab)).join("");
   }
 
-  function renderProfilePost(post) {
+  function renderProfilePost(post, mode) {
     const status = Number(post.auditStatus);
     const statusText = status === 1 ? "已通过" : status === 2 ? "已驳回" : "待审核";
     const statusClass = status === 1 ? "ok" : status === 2 ? "reject" : "pending";
     const likes = getOtherInteractionCount(post, "likes", "likedBy");
     const hugs = getOtherInteractionCount(post, "hugs", "huggedBy");
     const replies = Array.isArray(post.replies) ? post.replies.length : 0;
+    const interactionMarks = mode === "interacted" ? renderInteractionMarks(post) : "";
 
     return `
-      <article class="profile-post-card">
+      <article class="profile-post-card" data-post-id="${escapeHtml(post.id)}">
         <div class="profile-post-head">
-          <span class="profile-status ${statusClass}">${statusText}</span>
+          <span class="profile-status ${statusClass}">${mode === "interacted" ? "互动过" : statusText}</span>
           <time datetime="${escapeHtml(post.createdAt)}">${timeAgo(post.createdAt)}</time>
         </div>
         <strong>${escapeHtml(post.title || "匿名碎碎念")}</strong>
@@ -144,9 +185,18 @@
           <span>${hugs} 抱抱</span>
           <span>${replies} 回应</span>
         </div>
+        ${interactionMarks}
         ${post.auditReason ? `<div class="audit-reason">审核说明：${escapeHtml(post.auditReason)}</div>` : ""}
+        ${mode === "mine" && status === 2 ? `<div class="profile-post-actions"><button class="auth-btn admin" type="button" data-edit-post="${escapeHtml(post.id)}">重新编辑</button></div>` : ""}
       </article>
     `;
+  }
+
+  function renderInteractionMarks(post) {
+    const marks = [];
+    if (Array.isArray(post.likedBy) && post.likedBy.includes(loginUser.username)) marks.push("点过赞");
+    if (Array.isArray(post.huggedBy) && post.huggedBy.includes(loginUser.username)) marks.push("抱抱过");
+    return marks.length ? `<div class="profile-post-meta is-interaction">${marks.map((mark) => `<span>${mark}</span>`).join("")}</div>` : "";
   }
 
   function getSummary() {
@@ -183,6 +233,7 @@
       hugs: Number(post.hugs || 0),
       reports: Number(post.reports || 0),
       auditStatus: post.auditStatus === undefined ? 1 : Number(post.auditStatus),
+      isPinned: Number(post.isPinned || 0),
       media: normalizeMedia(post.media),
     }));
   }
@@ -218,6 +269,87 @@
   function getAvatarText() {
     const name = loginUser.nickname || loginUser.username || "你";
     return name.slice(0, 1).toUpperCase();
+  }
+
+  function renderAvatar() {
+    if (!dom.avatar) return;
+    if (loginUser && loginUser.avatarUrl) {
+      dom.avatar.innerHTML = `<img src="${escapeHtml(loginUser.avatarUrl)}" alt="当前头像" />`;
+    } else {
+      dom.avatar.textContent = getAvatarText();
+    }
+  }
+
+  function pickAvatar() {
+    if (dom.avatarInput) dom.avatarInput.click();
+  }
+
+  function handleAvatarChange(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!file.type || !file.type.startsWith("image/")) {
+      showToast("头像只支持图片文件。");
+      dom.avatarInput.value = "";
+      return;
+    }
+    if (file.size > 1500 * 1024) {
+      showToast("头像图片不能超过 1.5MB。");
+      dom.avatarInput.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => updateAvatar(reader.result);
+    reader.onerror = () => showToast("头像读取失败，请换一张图片。");
+    reader.readAsDataURL(file);
+  }
+
+  function updateAvatar(avatarUrl) {
+    fetch(api("/auth/avatar"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: JSON.stringify({ avatarUrl }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success) {
+          showToast(data.message || "头像更新失败");
+          return;
+        }
+        loginUser = data.user || { ...loginUser, avatarUrl };
+        localStorage.setItem("loginUser", JSON.stringify(loginUser));
+        renderUserHeader();
+        showToast("头像已更新。");
+      })
+      .catch(() => showToast("网络错误，请稍后再试"))
+      .finally(() => {
+        if (dom.avatarInput) dom.avatarInput.value = "";
+      });
+  }
+
+  function handlePostListClick(event) {
+    const button = event.target.closest("[data-edit-post]");
+    if (!button) return;
+    const post = state.posts.find((item) => item.id === button.dataset.editPost);
+    if (!post) return;
+    localStorage.setItem(
+      EDIT_POST_KEY,
+      JSON.stringify({
+        id: post.id,
+        title: post.title || "",
+        body: post.body || "",
+        category: post.category || "日常",
+        mood: post.mood || "微光",
+        alias: post.alias || "匿名同学",
+        tags: post.tags || [],
+        media: normalizeMedia(post.media),
+      }),
+    );
+    showToast("已放回发布框，正在前往编辑。");
+    window.setTimeout(() => {
+      location.href = api("/index.jsp");
+    }, 500);
   }
 
   function logout() {

@@ -247,6 +247,7 @@
         <div class="audit-actions">
           <button class="action-btn danger" type="button" data-user-action="status" data-next="${disabled ? "1" : "0"}" ${self ? "disabled" : ""}>${disabled ? "解除封号" : "封号"}</button>
           ${disabled ? "" : `<button class="action-btn ghost" type="button" data-user-action="mute" data-next="${muted ? "0" : "1"}" ${self ? "disabled" : ""}>${muted ? "解除禁言" : "禁言"}</button>`}
+          <button class="action-btn ghost" type="button" data-user-action="delete" ${self ? "disabled" : ""}>删除用户</button>
         </div>
       </article>
     `;
@@ -350,6 +351,9 @@
       } else {
         requestAction("user", "mute", { userId, muted: next, durationMinutes: 0 });
       }
+    } else if (button.dataset.userAction === "delete") {
+      if (!confirm("确定删除这个用户吗？删除后该账号不能再登录。")) return;
+      requestAction("user", "delete", { userId });
     }
   }
 
