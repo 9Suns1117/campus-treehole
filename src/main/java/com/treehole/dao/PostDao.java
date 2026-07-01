@@ -387,6 +387,7 @@ public class PostDao {
             conn = DBUtil.getConnection();
             if (conn == null) return false;
             ensurePostMediaColumn(conn);
+            ensurePostPinColumn(conn);
             return updatePostForResubmissionWithMedia(conn, post);
         } catch (SQLException e) {
             if (isMediaColumnError(e)) {

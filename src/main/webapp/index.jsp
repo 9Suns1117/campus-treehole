@@ -11,7 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-image-corrected.css?v=20260630-ai-report" />
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-image-corrected.css?v=20260701-profile-ai" />
   </head>
   <body>
     <div class="app-shell">
@@ -67,7 +67,7 @@
 
             <label>
               <span>内容</span>
-              <textarea id="postBody" rows="8" maxlength="520" placeholder="写下想说的话。发布后会先进入管理员审核。"></textarea>
+              <textarea id="postBody" rows="8" maxlength="520" placeholder="写下想说的话。发布前会先由 AI 审核。"></textarea>
             </label>
 
             <div class="media-uploader">
@@ -204,7 +204,7 @@
             <p class="eyebrow">轻声提醒</p>
             <ul class="quiet-list">
               <li>游客可以浏览，登录后才能发布、回应、点赞和举报。</li>
-              <li>新树洞和评论审核通过后才会出现在广场。</li>
+              <li>新树洞和评论会先由 AI 审核，通过后才会出现在广场。</li>
               <li>被举报多次后，会被送去管理员审核。</li>
             </ul>
           </section>
@@ -274,6 +274,6 @@
     <script>
       window.CONTEXT_PATH = "${pageContext.request.contextPath}";
     </script>
-    <script src="${pageContext.request.contextPath}/app.js?v=20260630-ai-report"></script>
+    <script src="${pageContext.request.contextPath}/app.js?v=20260701-profile-ai"></script>
   </body>
 </html>

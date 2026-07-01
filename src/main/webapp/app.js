@@ -1292,6 +1292,8 @@
     dom.moodButtons.forEach((button) => button.classList.toggle("active", button.dataset.mood === "微光"));
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(EDIT_POST_KEY);
+    const submitBtn = dom.form ? dom.form.querySelector("button[type='submit']") : null;
+    if (submitBtn) submitBtn.textContent = "提交审核";
     updateCounter();
     showToast("草稿已清空。");
   }
