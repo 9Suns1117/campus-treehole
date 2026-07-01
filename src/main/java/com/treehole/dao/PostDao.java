@@ -71,6 +71,38 @@ public class PostDao {
         return posts;
     }
 
+    /** 个人空间：当前用户点赞或抱抱过的已通过树洞。 */
+    public List<Post> getInteractedPostsByUser(String username) {
+        List<Post> posts = new ArrayList<>();
+        if (username == null || username.trim().isEmpty()) return posts;
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) return posts;
+            boolean hasPinColumn = ensurePostPinColumn(conn);
+            String sql = "SELECT * FROM post WHERE is_deleted = 0 AND audit_status = 1 ORDER BY " + (hasPinColumn ? "is_pinned DESC, " : "") + "created_at DESC";
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Post post = mapRowToPost(rs);
+                boolean liked = post.getLikedBy() != null && post.getLikedBy().contains(username);
+                boolean hugged = post.getHuggedBy() != null && post.getHuggedBy().contains(username);
+                if (liked || hugged) {
+                    post.setReplies(getRepliesByPostId(post.getId(), conn, false));
+                    posts.add(post);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            DBUtil.close(conn, pstmt, rs);
+        }
+        return posts;
+    }
+
     /** 管理员审核台：可看待审、通过、驳回的树洞。status 为 null 表示全部。 */
     public List<Post> getAuditPosts(Integer status) {
         List<Post> posts = new ArrayList<>();
@@ -301,8 +333,8 @@ public class PostDao {
     private boolean insertPostWithMedia(Connection conn, Post post) throws SQLException {
         PreparedStatement pstmt = null;
         try {
-            String sql = "INSERT INTO post (id, title, body, category, mood, alias, author_username, tags, media, likes, liked_by, hugs, hugged_by, reports, reported_by, created_at, audit_status, is_deleted) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+            String sql = "INSERT INTO post (id, title, body, category, mood, alias, author_username, tags, media, likes, liked_by, hugs, hugged_by, reports, reported_by, created_at, audit_status, audit_reason, audited_by, audited_at, is_deleted) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
             pstmt = conn.prepareStatement(sql);
             bindInsertPost(pstmt, post, true);
             return pstmt.executeUpdate() > 0;
@@ -315,8 +347,8 @@ public class PostDao {
         if (conn == null) return false;
         PreparedStatement pstmt = null;
         try {
-            String sql = "INSERT INTO post (id, title, body, category, mood, alias, author_username, tags, likes, liked_by, hugs, hugged_by, reports, reported_by, created_at, audit_status, is_deleted) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+            String sql = "INSERT INTO post (id, title, body, category, mood, alias, author_username, tags, likes, liked_by, hugs, hugged_by, reports, reported_by, created_at, audit_status, audit_reason, audited_by, audited_at, is_deleted) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
             pstmt = conn.prepareStatement(sql);
             bindInsertPost(pstmt, post, false);
             return pstmt.executeUpdate() > 0;
@@ -345,7 +377,99 @@ public class PostDao {
         pstmt.setInt(index++, post.getReports() == null ? 0 : post.getReports());
         pstmt.setString(index++, JSON.toJSONString(post.getReportedBy() == null ? new ArrayList<>() : post.getReportedBy()));
         pstmt.setTimestamp(index++, new java.sql.Timestamp(post.getCreatedAt().getTime()));
-        pstmt.setInt(index, post.getAuditStatus() == null ? 0 : post.getAuditStatus());
+        pstmt.setInt(index++, post.getAuditStatus() == null ? 0 : post.getAuditStatus());
+        bindAuditFields(pstmt, index, post);
+    }
+
+    public boolean updatePostForResubmission(Post post) {
+        Connection conn = null;
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) return false;
+            ensurePostMediaColumn(conn);
+            return updatePostForResubmissionWithMedia(conn, post);
+        } catch (SQLException e) {
+            if (isMediaColumnError(e)) {
+                try {
+                    return updatePostForResubmissionWithoutMedia(conn, post);
+                } catch (Exception fallbackException) {
+                    fallbackException.printStackTrace();
+                }
+            } else {
+                e.printStackTrace();
+            }
+            return false;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            DBUtil.close(conn, null, null);
+        }
+    }
+
+    private boolean updatePostForResubmissionWithMedia(Connection conn, Post post) throws SQLException {
+        PreparedStatement pstmt = null;
+        try {
+            String sql = "UPDATE post SET title = ?, body = ?, category = ?, mood = ?, alias = ?, tags = ?, media = ?, reports = 0, reported_by = ?, created_at = ?, audit_status = ?, audit_reason = ?, audited_by = ?, audited_at = ?, is_pinned = 0 " +
+                    "WHERE id = ? AND author_username = ? AND is_deleted = 0";
+            pstmt = conn.prepareStatement(sql);
+            bindResubmitPost(pstmt, post, true);
+            return pstmt.executeUpdate() > 0;
+        } finally {
+            DBUtil.close(null, pstmt, null);
+        }
+    }
+
+    private boolean updatePostForResubmissionWithoutMedia(Connection conn, Post post) throws SQLException {
+        if (conn == null) return false;
+        PreparedStatement pstmt = null;
+        try {
+            String sql = "UPDATE post SET title = ?, body = ?, category = ?, mood = ?, alias = ?, tags = ?, reports = 0, reported_by = ?, created_at = ?, audit_status = ?, audit_reason = ?, audited_by = ?, audited_at = ?, is_pinned = 0 " +
+                    "WHERE id = ? AND author_username = ? AND is_deleted = 0";
+            pstmt = conn.prepareStatement(sql);
+            bindResubmitPost(pstmt, post, false);
+            return pstmt.executeUpdate() > 0;
+        } finally {
+            DBUtil.close(null, pstmt, null);
+        }
+    }
+
+    private void bindResubmitPost(PreparedStatement pstmt, Post post, boolean includeMedia) throws SQLException {
+        int index = 1;
+        pstmt.setString(index++, post.getTitle());
+        pstmt.setString(index++, post.getBody());
+        pstmt.setString(index++, post.getCategory());
+        pstmt.setString(index++, post.getMood());
+        pstmt.setString(index++, post.getAlias());
+        pstmt.setString(index++, JSON.toJSONString(post.getTags() == null ? new ArrayList<>() : post.getTags()));
+        if (includeMedia) {
+            pstmt.setString(index++, JSON.toJSONString(post.getMedia() == null ? new ArrayList<>() : post.getMedia()));
+        }
+        pstmt.setString(index++, JSON.toJSONString(new ArrayList<>()));
+        pstmt.setTimestamp(index++, new java.sql.Timestamp(post.getCreatedAt().getTime()));
+        pstmt.setInt(index++, post.getAuditStatus() == null ? 0 : post.getAuditStatus());
+        bindAuditFields(pstmt, index, post);
+        index += 3;
+        pstmt.setString(index++, post.getId());
+        pstmt.setString(index, post.getAuthorUsername());
+    }
+
+    private void bindAuditFields(PreparedStatement pstmt, int index, Post post) throws SQLException {
+        if (post.getAuditReason() == null || post.getAuditReason().trim().isEmpty()) {
+            pstmt.setNull(index++, Types.VARCHAR);
+        } else {
+            pstmt.setString(index++, post.getAuditReason().trim());
+        }
+        if (post.getAuditedBy() == null || post.getAuditedBy().trim().isEmpty()) {
+            pstmt.setNull(index++, Types.VARCHAR);
+        } else {
+            pstmt.setString(index++, post.getAuditedBy().trim());
+        }
+        if (post.getAuditedAt() == null) {
+            pstmt.setNull(index, Types.TIMESTAMP);
+        } else {
+            pstmt.setTimestamp(index, new java.sql.Timestamp(post.getAuditedAt().getTime()));
+        }
     }
 
     private void ensurePostMediaColumn(Connection conn) {

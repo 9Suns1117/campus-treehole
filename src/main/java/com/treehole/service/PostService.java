@@ -9,7 +9,9 @@ public interface PostService {
     List<Post> getAllPosts();
     Post getPostById(String id);
     List<Post> getPostsByAuthor(String username);
+    List<Post> getInteractedPostsByUser(String username);
     boolean publishPost(Post post);
+    boolean resubmitPost(Post post);
     boolean actionPost(String postId, String action, String username);
     boolean addReply(Reply reply);
 
