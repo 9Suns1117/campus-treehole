@@ -1,0 +1,28 @@
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local coding-agent metadata
+.agents/
+.codex/
+
+# Build output
+target/
+out/
+build/
+
+# Logs
+*.log
+
+# Runtime uploads / temp files
+uploads/
+tmp/
+temp/
+
+# Local environment
+.env
+*.local
