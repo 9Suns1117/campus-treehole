@@ -35,7 +35,6 @@ public class PasswordUtil {
         if (isSha256Hash(storedPassword)) {
             return sha256(rawPassword).equalsIgnoreCase(storedPassword);
         }
-        // 兼容旧库里的明文密码：登录成功后由 Service 自动升级为 SHA-256。
         return rawPassword.equals(storedPassword);
     }
 }

@@ -1,0 +1,822 @@
+/* ==========================================================================
+   校屿树洞 · Nature Distilled 主题
+   风格：有机自然 / 温暖大地色系 / Lora + Raleway 字体
+   设计参考：Organic Biophilic + Nature Distilled
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
+
+.theme-nature {
+  color-scheme: light;
+
+  /* ── 大地色系 ── */
+  --nd-forest: #2D6A4F;
+  --nd-forest-light: #40916C;
+  --nd-olive: #6B7B3C;
+  --nd-terracotta: #C67B5C;
+  --nd-terracotta-soft: #D49A7A;
+  --nd-sand: #D4C4A8;
+  --nd-cream: #F5F0E1;
+  --nd-warm-clay: #B5651D;
+
+  /* ── 功能色 ── */
+  --bg-base: #E5D6C6;
+  --bg-deep: #D6C3AD;
+  --bg-warm: #C9B49A;
+
+  --ink: #1E1813;
+  --ink-strong: #0E0A07;
+  --ink-soft: #3A2F26;
+  --ink-mute: #68584A;
+  --ink-faint: rgba(104, 88, 74, 0.52);
+
+  --accent: #A86142;
+  --accent-deep: #8C472B;
+  --accent-soft: rgba(168, 97, 66, 0.28);
+  --danger: #9E281B;
+
+  --c-amber: #B58838;
+  --c-clay: #8A460E;
+  --c-sage: #6D8460;
+  --c-stone: #796B5B;
+  --c-sky: #7096A8;
+
+  /* ── 玻璃表面 ── */
+  --glass-bg: rgba(255, 255, 255, 0.45);
+  --glass-bg-strong: rgba(255, 255, 255, 0.60);
+  --glass-bg-soft: rgba(255, 255, 255, 0.30);
+  --glass-border: rgba(114, 66, 48, 0.28);
+  --glass-border-soft: rgba(114, 66, 48, 0.14);
+  --glass-rim: rgba(114, 66, 48, 0.36);
+
+  --blur-glass: blur(24px) saturate(150%);
+  --blur-soft: blur(14px) saturate(140%);
+  --blur-heavy: blur(32px) saturate(160%);
+
+  /* ── 阴影：自然柔和 ── */
+  --shadow-1:
+    0 1px 0 rgba(255, 255, 255, 0.45) inset,
+    0 2px 8px rgba(30, 24, 19, 0.16);
+  --shadow-2:
+    0 1px 0 rgba(255, 255, 255, 0.48) inset,
+    0 8px 24px rgba(30, 24, 19, 0.20);
+  --shadow-3:
+    0 1px 0 rgba(255, 255, 255, 0.52) inset,
+    0 16px 40px rgba(30, 24, 19, 0.26);
+  --shadow-glow: 0 8px 24px rgba(168, 97, 66, 0.28);
+
+  /* ── 圆角：有机变化 ── */
+  --r-pill: 999px;
+  --r-lg: 24px;
+  --r-md: 16px;
+  --r-sm: 12px;
+  --r-xs: 8px;
+
+  /* ── 字体 ── */
+  --font-serif: "Lora", "Noto Serif SC", "Songti SC", Georgia, serif;
+  --font-sans: "Raleway", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "Raleway", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── 间距 ── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* ── 动画 ── */
+  --ease: cubic-bezier(0.32, 0.72, 0.18, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── 主题切换按钮 ── */
+
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 0;
+}
+
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.60);
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 200ms var(--ease);
+}
+
+.theme-btn:hover {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-rim);
+  color: var(--ink-strong);
+}
+
+.theme-btn.is-active {
+  background: rgba(198, 123, 92, 0.20);
+  border-color: rgba(198, 123, 92, 0.40);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.theme-btn .icon-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.theme-btn .icon-dot--blue {
+  background: linear-gradient(135deg, #4f7fca, #8bb4f8);
+}
+
+.theme-btn .icon-dot--green {
+  background: linear-gradient(135deg, #2D6A4F, #40916C);
+}
+
+/* ── 主题切换过渡 ── */
+
+.app-shell,
+.topbar,
+.compose-panel,
+.mini-section,
+.feed-head,
+.toolbar,
+.hole-card,
+.auth-card,
+.notice,
+.campus-scene {
+  transition:
+    background 400ms var(--ease),
+    border-color 350ms var(--ease),
+    box-shadow 400ms var(--ease),
+    color 300ms var(--ease);
+}
+
+body {
+  transition:
+    background 500ms var(--ease),
+    color 300ms var(--ease);
+}
+
+/* ==========================================================================
+   Nature Distilled 主题覆盖
+   利用 .theme-nature 作用域覆盖默认 Blue Hour 样式
+   ========================================================================== */
+
+.theme-nature body {
+  color: var(--ink);
+  background:
+    radial-gradient(44vmax 44vmax at 12% 14%, rgba(168, 97, 66, 0.18), transparent 62%),
+    radial-gradient(42vmax 42vmax at 88% 12%, rgba(109, 132, 96, 0.16), transparent 62%),
+    radial-gradient(52vmax 52vmax at 80% 86%, rgba(112, 150, 168, 0.12), transparent 66%),
+    radial-gradient(38vmax 38vmax at 8% 86%, rgba(99, 112, 52, 0.12), transparent 62%),
+    linear-gradient(180deg, #D6C3AD 0%, #C9B49A 46%, #BFA68A 100%);
+  background-attachment: fixed;
+}
+
+.theme-nature body::before {
+  background:
+    radial-gradient(32vmax 32vmax at 88% 22%, rgba(168, 97, 66, 0.18), transparent 66%),
+    radial-gradient(30vmax 30vmax at 76% 78%, rgba(138, 70, 14, 0.12), transparent 70%),
+    radial-gradient(28vmax 28vmax at 16% 66%, rgba(112, 150, 168, 0.16), transparent 68%);
+}
+
+.theme-nature body::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.30), transparent 40%),
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.20), transparent 38%);
+  opacity: 0.60;
+}
+
+.theme-nature ::selection {
+  background: rgba(168, 97, 66, 0.50);
+  color: #0E0A07;
+}
+
+/* ── Topbar ── */
+
+.theme-nature .topbar {
+  background:
+    linear-gradient(110deg, rgba(198, 123, 92, 0.14), rgba(143, 168, 122, 0.10) 48%, rgba(245, 240, 225, 0.30)),
+    rgba(255, 255, 255, 0.50);
+  border-color: var(--glass-border);
+}
+
+.theme-nature .topbar::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.30), transparent 40%),
+    radial-gradient(circle at 90% 28%, rgba(198, 123, 92, 0.10), transparent 34%);
+}
+
+.theme-nature .topbar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("assets/nature-distilled-bg.png");
+  background-size: cover;
+  background-position: center 30%;
+  background-repeat: no-repeat;
+  opacity: 0.75;
+}
+
+/* ── Brand ── */
+
+.theme-nature .brand-mark {
+  background:
+    radial-gradient(circle at 36% 30%, rgba(198, 123, 92, 0.80), rgba(107, 123, 60, 0.50) 45%, rgba(143, 168, 122, 0.30) 100%);
+  border-color: rgba(198, 123, 92, 0.30);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.50) inset,
+    0 10px 24px rgba(198, 123, 92, 0.20);
+}
+
+/* ── Auth buttons ── */
+
+.theme-nature .auth-btn {
+  background: rgba(198, 123, 92, 0.08);
+  color: var(--ink);
+  border-color: var(--glass-border);
+}
+
+.theme-nature .auth-btn:hover {
+  background: rgba(198, 123, 92, 0.14);
+  border-color: var(--glass-rim);
+}
+
+.theme-nature .auth-btn.ghost {
+  background: rgba(198, 123, 92, 0.04);
+  color: var(--ink-soft);
+}
+
+.theme-nature .auth-btn.admin {
+  background: linear-gradient(135deg, #C67B5C, #A86142);
+  border-color: rgba(198, 123, 92, 0.40);
+  color: #FFFFFF;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.40) inset,
+    0 10px 24px rgba(198, 123, 92, 0.25);
+}
+
+/* ── Stats strip ── */
+
+.theme-nature .top-stats b {
+  color: var(--nd-forest);
+}
+
+.theme-nature .top-stats i {
+  color: var(--ink-mute);
+}
+
+/* ── Glass surfaces ── */
+
+.theme-nature .compose-panel,
+.theme-nature .mini-section,
+.theme-nature .feed-head,
+.theme-nature .toolbar,
+.theme-nature .empty-state {
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.08), rgba(143, 168, 122, 0.06)),
+    rgba(255, 255, 255, 0.60);
+  border-color: var(--glass-border);
+}
+
+.theme-nature .compose-panel::before,
+.theme-nature .mini-section::before,
+.theme-nature .feed-head::before,
+.theme-nature .toolbar::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.30), transparent 35%),
+    radial-gradient(circle at 92% 92%, rgba(198, 123, 92, 0.08), transparent 42%);
+}
+
+/* ── Headings ── */
+
+.theme-nature h1 {
+  color: var(--ink-strong);
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+.theme-nature h2 {
+  color: var(--ink-strong);
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+.theme-nature .eyebrow {
+  color: var(--ink-mute);
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+
+/* ── Input fields ── */
+
+.theme-nature .composer input,
+.theme-nature .composer textarea,
+.theme-nature .composer select,
+.theme-nature .search-box input,
+.theme-nature .sort-select select,
+.theme-nature .reply-form input,
+.theme-nature .auth-card input {
+  border-color: rgba(198, 123, 92, 0.20);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--ink);
+}
+
+.theme-nature .composer input::placeholder,
+.theme-nature .composer textarea::placeholder,
+.theme-nature .search-box input::placeholder,
+.theme-nature .auth-card input::placeholder {
+  color: rgba(92, 83, 70, 0.40);
+}
+
+.theme-nature .composer input:focus,
+.theme-nature .composer textarea:focus,
+.theme-nature .composer select:focus,
+.theme-nature .search-box input:focus,
+.theme-nature .auth-card input:focus {
+  background: rgba(255, 255, 255, 0.60);
+  border-color: rgba(198, 123, 92, 0.50);
+  box-shadow:
+    0 0 0 3px rgba(198, 123, 92, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.30) inset;
+}
+
+/* ── Mood / Filter buttons ── */
+
+.theme-nature .mood,
+.theme-nature .filter {
+  border-color: rgba(198, 123, 92, 0.20);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.08), rgba(143, 168, 122, 0.04)),
+    rgba(255, 255, 255, 0.35);
+  color: var(--ink-soft);
+}
+
+.theme-nature .mood:hover,
+.theme-nature .filter:hover {
+  background: rgba(198, 123, 92, 0.10);
+  color: var(--ink-strong);
+  border-color: var(--glass-rim);
+}
+
+.theme-nature .mood.active,
+.theme-nature .filter.active {
+  background:
+    linear-gradient(135deg, #C67B5C, #A86142);
+  border-color: rgba(198, 123, 92, 0.40);
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.30) inset,
+    0 10px 22px rgba(198, 123, 92, 0.20);
+}
+
+/* ── Primary button ── */
+
+.theme-nature .primary-btn {
+  border-color: rgba(198, 123, 92, 0.40);
+  background:
+    linear-gradient(135deg, #C67B5C 0%, #B5651D 100%);
+  color: #FFFFFF;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.40) inset,
+    0 12px 30px rgba(198, 123, 92, 0.25);
+}
+
+.theme-nature .primary-btn:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.40) inset,
+    0 16px 36px rgba(198, 123, 92, 0.32);
+}
+
+/* ── Notice block ── */
+
+.theme-nature .notice {
+  border-color: rgba(198, 123, 92, 0.18);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(143, 168, 122, 0.06));
+  color: var(--ink-soft);
+}
+
+.theme-nature .notice strong {
+  color: var(--nd-forest);
+}
+
+/* ── Media picker ── */
+
+.theme-nature .media-pick-btn {
+  border-color: rgba(107, 123, 60, 0.30);
+  background:
+    linear-gradient(135deg, rgba(107, 123, 60, 0.16), rgba(143, 168, 122, 0.10));
+}
+
+/* ── Campus scene ── */
+
+.theme-nature .campus-scene {
+  border-color: rgba(198, 123, 92, 0.20);
+  background:
+    linear-gradient(118deg, rgba(198, 123, 92, 0.14) 0%, rgba(143, 168, 122, 0.10) 44%, rgba(143, 182, 199, 0.08) 100%),
+    rgba(255, 255, 255, 0.45);
+}
+
+.theme-nature .campus-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("assets/nature-distilled-bg.png");
+  background-size: cover;
+  background-position: center 20%;
+  background-repeat: no-repeat;
+  opacity: 0.60;
+}
+
+.theme-nature .campus-scene::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20), transparent 35%),
+    radial-gradient(circle at 78% 44%, rgba(198, 123, 92, 0.10), transparent 32%),
+    radial-gradient(circle at 16% 78%, rgba(143, 182, 199, 0.08), transparent 42%),
+    linear-gradient(90deg, rgba(245, 240, 225, 0.20), transparent 34%, rgba(245, 240, 225, 0.10));
+}
+
+/* ── Hole card ── */
+
+.theme-nature .hole-card {
+  border-color: var(--glass-border);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.08), rgba(143, 168, 122, 0.06)),
+    rgba(255, 255, 255, 0.55);
+}
+
+.theme-nature .hole-card::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20), transparent 35%),
+    radial-gradient(96% 70% at 100% 0%, rgba(198, 123, 92, 0.06), transparent 54%),
+    radial-gradient(100% 76% at 0% 100%, rgba(107, 123, 60, 0.06), transparent 55%);
+}
+
+.theme-nature .hole-card:hover {
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(143, 168, 122, 0.08)),
+    rgba(255, 255, 255, 0.60);
+}
+
+/* ── Tags ── */
+
+.theme-nature .tag {
+  border-color: rgba(198, 123, 92, 0.18);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(107, 123, 60, 0.06));
+  color: var(--ink-soft);
+}
+
+.theme-nature .tag:hover {
+  background: rgba(198, 123, 92, 0.12);
+  color: var(--ink-strong);
+}
+
+/* ── Category / Mood pills ── */
+
+.theme-nature .category-pill {
+  border-color: rgba(198, 123, 92, 0.22);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.14), rgba(255, 255, 255, 0.10));
+  color: var(--ink-soft);
+}
+
+.theme-nature .mood-pill {
+  background:
+    linear-gradient(140deg, rgba(198, 123, 92, 0.35), rgba(143, 168, 122, 0.10));
+  border-color: rgba(198, 123, 92, 0.35);
+  color: var(--ink-strong);
+}
+
+/* ── Reply items ── */
+
+.theme-nature .reply-item {
+  background: rgba(198, 123, 92, 0.05);
+  border-color: rgba(198, 123, 92, 0.10);
+  color: var(--ink);
+}
+
+.theme-nature .reply-form button {
+  border-color: rgba(198, 123, 92, 0.35);
+  background:
+    linear-gradient(135deg, #C67B5C, #A86142);
+  color: #FFFFFF;
+  box-shadow: 0 8px 20px rgba(198, 123, 92, 0.18);
+}
+
+/* ── Action buttons ── */
+
+.theme-nature .action-btn {
+  border-color: rgba(198, 123, 92, 0.20);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.08), rgba(143, 168, 122, 0.04));
+  color: var(--ink-soft);
+}
+
+.theme-nature .action-btn:hover,
+.theme-nature .action-btn.is-active {
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.14), rgba(143, 168, 122, 0.08));
+  border-color: var(--glass-rim);
+  color: var(--ink-strong);
+}
+
+.theme-nature .action-btn.danger {
+  border-color: rgba(192, 57, 43, 0.30);
+  color: #C0392B;
+}
+
+.theme-nature .action-btn.danger:hover {
+  background: rgba(192, 57, 43, 0.12);
+  color: #A93226;
+}
+
+/* ── Sidebar AI card ── */
+
+.theme-nature .ai-entry-card--primary {
+  border-color: rgba(107, 123, 60, 0.25);
+  background:
+    linear-gradient(135deg, rgba(107, 123, 60, 0.12), rgba(143, 168, 122, 0.08));
+}
+
+.theme-nature .side-entry-btn.ai {
+  border-color: rgba(107, 123, 60, 0.30);
+  background:
+    linear-gradient(135deg, rgba(107, 123, 60, 0.18), rgba(143, 168, 122, 0.10));
+}
+
+.theme-nature .ghost-icon {
+  background: rgba(198, 123, 92, 0.10);
+  color: var(--ink-soft);
+  border-color: var(--glass-border);
+}
+
+.theme-nature .ghost-icon:hover {
+  background: rgba(198, 123, 92, 0.18);
+  color: var(--ink-strong);
+}
+
+/* ── Interaction alert ── */
+
+.theme-nature .scene-tag,
+.theme-nature .scene-foot {
+  color: #2D6A4F;
+}
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.14), rgba(143, 168, 122, 0.08));
+  box-shadow: var(--shadow-3);
+}
+
+.theme-nature .interaction-alert::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent 35%),
+    linear-gradient(90deg, rgba(198, 123, 92, 0.10), transparent 42%);
+}
+
+/* ── Auth modal ── */
+
+.theme-nature .auth-modal {
+  background: rgba(245, 240, 225, 0.50);
+}
+
+.theme-nature .auth-card {
+  border-color: var(--glass-rim);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(143, 168, 122, 0.06)),
+    rgba(255, 255, 255, 0.70);
+}
+
+.theme-nature .auth-close {
+  background: rgba(198, 123, 92, 0.10);
+  color: var(--ink-soft);
+}
+
+.theme-nature .auth-close:hover {
+  background: rgba(198, 123, 92, 0.16);
+  color: var(--ink-strong);
+}
+
+/* ── AI Chat ── */
+
+.theme-nature .ai-chat-dialog {
+  border-color: var(--glass-rim);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(143, 168, 122, 0.06)),
+    rgba(255, 255, 255, 0.72);
+}
+
+.theme-nature .ai-chat-body {
+  border-color: var(--glass-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.08));
+}
+
+.theme-nature .ai-message.assistant span {
+  background: rgba(198, 123, 92, 0.08);
+}
+
+.theme-nature .ai-message.user span {
+  border-color: rgba(198, 123, 92, 0.25);
+  background:
+    linear-gradient(135deg, #C67B5C, #A86142);
+  color: #FFFFFF;
+}
+
+.theme-nature .ai-chat-form input {
+  border-color: var(--glass-border);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--ink);
+}
+
+.theme-nature .ai-chat-form input:focus {
+  background: rgba(255, 255, 255, 0.60);
+  border-color: rgba(198, 123, 92, 0.50);
+  box-shadow:
+    0 0 0 3px rgba(198, 123, 92, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.30) inset;
+}
+
+.theme-nature .profile-avatar {
+  border-color: rgba(198, 123, 92, 0.30);
+  background:
+    linear-gradient(135deg, #C67B5C, rgba(143, 168, 122, 0.50));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.40) inset,
+    0 12px 26px rgba(198, 123, 92, 0.18);
+}
+
+/* ── Profile dialog ── */
+
+.theme-nature .profile-dialog {
+  border-color: var(--glass-rim);
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(143, 168, 122, 0.06)),
+    rgba(255, 255, 255, 0.72);
+}
+
+.theme-nature .profile-account-card,
+.theme-nature .profile-overview-card {
+  border-color: var(--glass-border);
+  background: rgba(255, 255, 255, 0.50);
+}
+
+/* ── Toast ── */
+
+.theme-nature .toast {
+  border-color: var(--glass-rim);
+  background: rgba(245, 240, 225, 0.88);
+  color: var(--ink-strong);
+}
+
+/* ── Interaction badges ── */
+
+.theme-nature .interaction-badge,
+.theme-nature .ai-status,
+.theme-nature .profile-status {
+  border-color: var(--glass-border);
+  background: rgba(198, 123, 92, 0.10);
+}
+
+.theme-nature .ai-status {
+  color: var(--nd-forest);
+  border-color: rgba(107, 123, 60, 0.30);
+}
+
+/* ── Media uploader ── */
+
+.theme-nature .media-uploader {
+  border-color: var(--glass-border);
+  background: rgba(198, 123, 92, 0.04);
+}
+
+/* ── Select options ── */
+
+.theme-nature .composer select option,
+.theme-nature .sort-select select option {
+  background: #EDE4D8;
+  color: var(--ink);
+}
+
+/* ── Profile page specific ── */
+
+.theme-nature .profile-post-card {
+  border-color: var(--glass-border);
+  background: rgba(255, 255, 255, 0.50);
+}
+
+.theme-nature .profile-scoreboard span {
+  border-color: var(--glass-border);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.theme-nature .profile-scoreboard b {
+  color: var(--nd-forest);
+}
+
+.theme-nature .profile-status.ok {
+  color: var(--nd-forest);
+  border-color: rgba(45, 106, 79, 0.30);
+}
+
+.theme-nature .profile-status.pending {
+  color: var(--c-amber);
+  border-color: rgba(212, 168, 87, 0.30);
+}
+
+.theme-nature .profile-status.reject {
+  color: var(--danger);
+  border-color: rgba(192, 57, 43, 0.30);
+}
+
+/* ── Profile list tabs ── */
+
+.theme-nature .profile-list-tabs .auth-btn {
+  background: rgba(198, 123, 92, 0.06);
+}
+
+/* ── Warmth meter ── */
+
+.theme-nature .warmth-meter {
+  background: rgba(198, 123, 92, 0.10);
+  border-color: var(--glass-border);
+}
+
+.theme-nature .warmth-meter span {
+  background:
+    linear-gradient(90deg, #A86142 0%, #C67B5C 48%, #D4C4A8 100%);
+  box-shadow: 0 0 12px rgba(198, 123, 92, 0.20);
+}
+
+/* ── admin audit ── */
+
+.theme-nature .audit-head,
+.theme-nature .audit-toolbar,
+.theme-nature .audit-card {
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.08), rgba(143, 168, 122, 0.06)),
+    rgba(255, 255, 255, 0.60);
+  border-color: var(--glass-border);
+}
+
+.theme-nature .audit-card::before,
+.theme-nature .audit-head::before,
+.theme-nature .audit-toolbar::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent 35%),
+    radial-gradient(circle at 96% 0%, rgba(198, 123, 92, 0.08), transparent 38%);
+}
+
+.theme-nature .audit-card:hover {
+  background:
+    linear-gradient(135deg, rgba(198, 123, 92, 0.10), rgba(143, 168, 122, 0.08)),
+    rgba(255, 255, 255, 0.65);
+}
+
+.theme-nature .audit-reason {
+  border-color: rgba(192, 57, 43, 0.20);
+  background: rgba(192, 57, 43, 0.06);
+  color: #C0392B;
+}
+
+/* ── Fallback support ── */
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .theme-nature .topbar,
+  .theme-nature .compose-panel,
+  .theme-nature .mini-section,
+  .theme-nature .feed-head,
+  .theme-nature .toolbar,
+  .theme-nature .empty-state,
+  .theme-nature .hole-card,
+  .theme-nature .toast,
+  .theme-nature .auth-card {
+    background: rgba(245, 240, 225, 0.92);
+  }
+
+  .theme-nature .campus-scene {
+    background: linear-gradient(118deg, #C67B5C 0%, #8FA87A 48%, #8FB6C7 100%);
+  }
+}

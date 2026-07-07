@@ -1,5 +1,5 @@
-package com.treehole.service.impl;
 
+package com.treehole.service.impl;
 import com.treehole.dao.PostDao;
 import com.treehole.pojo.Post;
 import com.treehole.pojo.Reply;
@@ -7,6 +7,7 @@ import com.treehole.pojo.AiAuditResult;
 import com.treehole.service.PostService;
 
 import java.util.Date;
+import java.util.ArrayList;
 import java.util.List;
 
 public class PostServiceImpl implements PostService {
@@ -96,7 +97,7 @@ public class PostServiceImpl implements PostService {
 
         boolean saved = updated && postDao.updatePostStats(post);
         if (saved && "report".equals(action) && post.getReports() != null && post.getReports() >= 3) {
-            postDao.auditPost(postId, 0, "多次举报，待管理员复核", "system");
+            postDao.auditPost(postId, 0, "Multiple reports, pending admin review", "system");
         }
         return saved;
     }
@@ -108,6 +109,15 @@ public class PostServiceImpl implements PostService {
         if (reply.getBody().length() > 120) return false;
         Post parent = postDao.getPostById(reply.getPostId());
         if (parent == null || parent.getAuditStatus() == null || parent.getAuditStatus() != 1) return false;
+        if (reply.getParentReplyId() != null && !reply.getParentReplyId().trim().isEmpty()) {
+            Reply parentReply = postDao.getReplyById(reply.getParentReplyId());
+            if (parentReply == null || parentReply.getAuditStatus() == null || parentReply.getAuditStatus() != 1) return false;
+            if (parentReply.getPostId() == null || !parentReply.getPostId().equals(reply.getPostId())) return false;
+            if (parentReply.getParentReplyId() != null && !parentReply.getParentReplyId().trim().isEmpty()) return false;
+            reply.setParentReplyId(parentReply.getId());
+        } else {
+            reply.setParentReplyId(null);
+        }
 
         AiAuditResult result = aiCommentAuditService.auditReply(reply.getBody());
         reply.setAuditStatus(result.getStatus());
@@ -115,7 +125,61 @@ public class PostServiceImpl implements PostService {
         reply.setAuditedBy(result.getStatus() == 0 ? null : "AI");
         reply.setAuditedAt(result.getStatus() == 0 ? null : new Date());
         reply.setIsDeleted(0);
+        reply.setLikes(0);
+        reply.setLikedBy(new ArrayList<String>());
+        reply.setHugs(0);
+        reply.setHuggedBy(new ArrayList<String>());
+        reply.setReports(0);
+        reply.setReportedBy(new ArrayList<String>());
         return postDao.insertReply(reply);
+    }
+
+    @Override
+    public boolean actionReply(String replyId, String action, String username) {
+        Reply reply = postDao.getReplyById(replyId);
+        if (reply == null || reply.getAuditStatus() == null || reply.getAuditStatus() != 1) return false;
+        if (reply.getLikedBy() == null) reply.setLikedBy(new ArrayList<String>());
+        if (reply.getHuggedBy() == null) reply.setHuggedBy(new ArrayList<String>());
+        if (reply.getReportedBy() == null) reply.setReportedBy(new ArrayList<String>());
+        if (reply.getLikes() == null) reply.setLikes(0);
+        if (reply.getHugs() == null) reply.setHugs(0);
+        if (reply.getReports() == null) reply.setReports(0);
+
+        boolean updated = false;
+        if ("like".equals(action)) {
+            if (reply.getLikedBy().contains(username)) {
+                reply.getLikedBy().remove(username);
+                reply.setLikes(Math.max(0, reply.getLikes() - 1));
+            } else {
+                reply.getLikedBy().add(username);
+                reply.setLikes(reply.getLikes() + 1);
+            }
+            updated = true;
+        } else if ("hug".equals(action)) {
+            if (reply.getHuggedBy().contains(username)) {
+                reply.getHuggedBy().remove(username);
+                reply.setHugs(Math.max(0, reply.getHugs() - 1));
+            } else {
+                reply.getHuggedBy().add(username);
+                reply.setHugs(reply.getHugs() + 1);
+            }
+            updated = true;
+        } else if ("report".equals(action)) {
+            if (reply.getReportedBy().contains(username)) {
+                reply.getReportedBy().remove(username);
+                reply.setReports(Math.max(0, reply.getReports() - 1));
+            } else {
+                reply.getReportedBy().add(username);
+                reply.setReports(reply.getReports() + 1);
+            }
+            updated = true;
+        }
+
+        boolean saved = updated && postDao.updateReplyStats(reply);
+        if (saved && "report".equals(action) && reply.getReports() != null && reply.getReports() >= 3) {
+            postDao.auditReply(replyId, 0, "Multiple reports, pending admin review", "system");
+        }
+        return saved;
     }
 
     @Override

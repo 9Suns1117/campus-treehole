@@ -16,10 +16,15 @@ import java.util.Properties;
 
 public class AiGatewayService {
     private static final String DEFAULT_AUDIT_PROMPT =
-            "你是校园匿名树洞内容审核员。判断内容是否适合公开展示。需要拦截辱骂、人身攻击、色情低俗、暴力威胁、违法违规、泄露隐私、广告引流、歧视仇恨、骚扰、恶意引战、自伤自杀煽动等。正常校园交流、学习生活求助、普通情绪表达可以通过。只返回 JSON：{\"pass\":true 或 false,\"reason\":\"20字以内中文原因\",\"risk\":\"normal/abuse/privacy/sexual/violence/illegal/ad/harassment/self_harm/other\"}";
+            "你是校园匿名树洞内容审核员。请严格判断内容是否适合公开展示。" +
+            "必须从整体语义判断，不要只按关键词判断。必须拦截所有明显风险类型，包括但不限于：辱骂、人身攻击、骚扰、恶意引战、歧视仇恨、色情低俗、暴力威胁、违法违规、自伤自杀煽动、泄露个人隐私、广告引流、联系方式引流、买卖推广、刷屏灌水、诈骗可疑内容。" +
+            "如果内容含有微信/QQ/电话/手机号/加V等联系方式，并带有推广、交易、引流、招揽、兼职、代做、群聊、广告、私下联系等意图，应判定不通过。" +
+            "如果内容疑似营销、拉人、导流、诈骗、灰产或不适合校园公共社区展示，即使没有粗口也应判定不通过。" +
+            "普通校园交流、学习生活求助、真实情绪表达、非攻击性的玩笑可以通过。" +
+            "只返回严格 JSON，不要返回 Markdown 或解释。格式：{\"pass\":true或false,\"reason\":\"20字以内中文原因\",\"risk\":\"normal/abuse/privacy/sexual/violence/illegal/ad/harassment/self_harm/spam/fraud/other\"}。如果 risk 不是 normal，pass 必须是 false。";
 
     private static final String DEFAULT_CHAT_PROMPT =
-            "你是校园树洞里的 AI 伙伴。你要温柔、克制、真诚，帮助同学整理心情、润色树洞、拆解困扰。不要替用户做危险决定；遇到自伤、自杀、暴力、违法等高风险内容时，先安抚并建议联系现实中的可信任的人或专业帮助。回答用简洁中文。";
+            "你是校园树洞里的 AI 伙伴，名字叫做小树洞。你要温柔、克制、真诚，帮助同学整理心情、润色树洞、拆解困扰。不要替用户做危险决定；遇到自伤、自杀、暴力、违法等高风险内容时，先安抚并建议联系现实中的可信任的人或专业帮助。回答用简洁中文。";
 
     private final Properties config = new Properties();
 
@@ -186,10 +191,19 @@ public class AiGatewayService {
             if (pass == null) return AiAuditResult.pending("AI返回缺少pass字段");
             String reason = decision.getString("reason");
             String risk = decision.getString("risk");
+            if (pass && hasBlockingRisk(risk)) {
+                return AiAuditResult.rejected(reason == null || reason.trim().isEmpty() ? "AI判定存在风险" : reason, risk);
+            }
             return pass ? AiAuditResult.approved(reason, risk) : AiAuditResult.rejected(reason, risk);
         } catch (Exception e) {
             return AiAuditResult.pending("AI解析失败：" + compact(e.getMessage(), 50));
         }
+    }
+
+    private boolean hasBlockingRisk(String risk) {
+        if (risk == null) return false;
+        String value = risk.trim().toLowerCase();
+        return !value.isEmpty() && !"normal".equals(value) && !"safe".equals(value) && !"none".equals(value);
     }
 
     private String parseChatContent(String apiResponse) {

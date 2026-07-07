@@ -2,6 +2,7 @@ package com.treehole.servlet;
 
 import com.alibaba.fastjson.JSON;
 import com.treehole.dao.AuthDao;
+import com.treehole.dao.ListenerDao;
 import com.treehole.pojo.TreeholeUser;
 import com.treehole.service.PostService;
 import com.treehole.service.impl.PostServiceImpl;
@@ -22,6 +23,7 @@ public class AdminServlet extends HttpServlet {
 
     private PostService postService = new PostServiceImpl();
     private AuthDao authDao = new AuthDao();
+    private ListenerDao listenerDao = new ListenerDao();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -40,6 +42,8 @@ public class AdminServlet extends HttpServlet {
             writeJson(response, ok("查询成功", "replies", postService.getAuditReplies(status)));
         } else if ("/users".equals(pathInfo)) {
             writeJson(response, ok("查询成功", "users", safeUsers(authDao.getAllUsers())));
+        } else if ("/listeners".equals(pathInfo)) {
+            writeJson(response, ok("查询成功", "listeners", listenerDao.getProfilesByStatus(status)));
         } else {
             writeJson(response, fail("接口不存在"));
         }
@@ -63,6 +67,7 @@ public class AdminServlet extends HttpServlet {
         Integer muted = getInteger(body, "muted");
         Integer durationMinutes = getInteger(body, "durationMinutes");
         Integer pinned = getInteger(body, "pinned");
+        Long listenerId = getLong(body, "listenerId");
 
         boolean success;
         if ("/post/audit".equals(pathInfo)) {
@@ -89,6 +94,8 @@ public class AdminServlet extends HttpServlet {
             success = updateUserMuteStatus(admin, userId, muted, durationMinutes);
         } else if ("/user/delete".equals(pathInfo)) {
             success = deleteUser(admin, userId);
+        } else if ("/listener/audit".equals(pathInfo)) {
+            success = listenerDao.auditApplication(listenerId, status, reason, admin.getUsername());
         } else {
             writeJson(response, fail("接口不存在"));
             return;

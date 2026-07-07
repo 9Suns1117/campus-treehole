@@ -7,17 +7,39 @@
     <title>校屿树洞 · 个人空间</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem("campus-treehole-theme-v1");
+        document.documentElement.dataset.theme = savedTheme === "nature" ? "nature" : "blue";
+        if (savedTheme === "nature") {
+          document.documentElement.classList.add("theme-nature");
+        }
+      })();
+    </script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-image-corrected.css?v=20260701-profile-ai" />
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-image-corrected.css?v=20260702-tag-privacy" />
+    <link id="blueHourThemeStyles" rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-premium.css?v=20260701-blue-hour-premium" />
+    <link id="natureThemeStyles" rel="stylesheet" href="${pageContext.request.contextPath}/styles-nature-distilled.css?v=20260701-nature-distilled" />
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem("campus-treehole-theme-v1");
+        if (savedTheme !== "bluehour") {
+          document.getElementById("blueHourThemeStyles").disabled = true;
+        }
+        if (savedTheme !== "nature") {
+          document.getElementById("natureThemeStyles").disabled = true;
+        }
+      })();
+    </script>
   </head>
   <body>
     <div class="app-shell profile-shell">
       <header class="topbar">
         <div class="topbar-row topbar-row--top">
-          <a class="brand" href="${pageContext.request.contextPath}/index.jsp" aria-label="返回校屿树洞首页">
+          <a class="brand" href="${pageContext.request.contextPath}/plaza.jsp" aria-label="返回校屿树洞广场">
             <span class="brand-mark" aria-hidden="true">○</span>
             <span class="brand-text">
               <span class="brand-kicker">CAMPUS WHISPER · PERSONAL SPACE</span>
@@ -27,7 +49,7 @@
 
           <div class="user-actions" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
             <span id="profileUserText" style="font-size: 14px; font-weight: 500; color: var(--ink-soft);">正在读取账号…</span>
-            <a class="auth-btn ghost" href="${pageContext.request.contextPath}/index.jsp">返回广场</a>
+            <a class="auth-btn ghost" href="${pageContext.request.contextPath}/plaza.jsp">返回广场</a>
             <a class="auth-btn admin" id="profileAdminAuditLink" href="${pageContext.request.contextPath}/admin_audit.jsp" style="display:none;">审核台</a>
             <button class="auth-btn ghost" id="profileLogoutBtn" type="button">退出登录</button>
           </div>
@@ -64,6 +86,14 @@
                 <input id="profileAvatarInput" type="file" accept="image/*" hidden />
               </div>
             </div>
+            <div class="account-list" id="profileAccountList"></div>
+            <div class="profile-privacy-setting" id="profilePrivacySetting">
+              <div>
+                <strong>公开个人主页</strong>
+                <span>关闭后，别人点击你的昵称不会看到发布记录。</span>
+              </div>
+              <button class="privacy-toggle" id="profilePublicToggle" type="button" aria-pressed="true">已公开</button>
+            </div>
           </section>
 
           <section class="profile-overview-card">
@@ -94,6 +124,6 @@
     <script>
       window.CONTEXT_PATH = "${pageContext.request.contextPath}";
     </script>
-    <script src="${pageContext.request.contextPath}/profile.js?v=20260701-profile-edit"></script>
+    <script src="${pageContext.request.contextPath}/profile.js?v=20260702-tag-privacy"></script>
   </body>
 </html>

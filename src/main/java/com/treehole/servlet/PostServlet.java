@@ -51,6 +51,9 @@ public class PostServlet extends HttpServlet {
                 return;
             }
             writeJson(response, postService.getInteractedPostsByUser(user.getUsername()));
+        } else if ("/author".equals(pathInfo)) {
+            String username = request.getParameter("username");
+            writeJson(response, publicPostsByAuthor(username));
         } else {
             writeJson(response, fail("接口不存在"));
         }
@@ -69,6 +72,8 @@ public class PostServlet extends HttpServlet {
             actionPost(request, response);
         } else if ("/reply".equals(pathInfo)) {
             addReply(request, response);
+        } else if ("/reply/action".equals(pathInfo)) {
+            actionReply(request, response);
         } else {
             writeJson(response, fail("接口不存在"));
         }
@@ -93,7 +98,6 @@ public class PostServlet extends HttpServlet {
         try {
             String json = readBody(request);
             Post post = JSON.parseObject(json, Post.class);
-            boolean adminPost = activeUser.getRole() != null && activeUser.getRole() == 2;
             post.setId("hole-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8));
             post.setAuthorUsername(activeUser.getUsername());
             post.setAlias(normalizeAlias(post.getAlias()));
@@ -106,15 +110,12 @@ public class PostServlet extends HttpServlet {
             post.setReports(0);
             post.setReportedBy(new ArrayList<String>());
             post.setReplies(new ArrayList<Reply>());
-            post.setAuditStatus(adminPost ? 1 : 0);
-            post.setAuditedBy(adminPost ? activeUser.getUsername() : null);
-            post.setAuditedAt(adminPost ? new Date() : null);
+            post.setAuditStatus(0);
+            post.setAuditedBy(null);
+            post.setAuditedAt(null);
             post.setIsDeleted(0);
 
-            if (!adminPost) {
-                AiAuditResult auditResult = aiGatewayService.auditPost(post.getTitle(), post.getBody(), post.getTags() == null ? "" : post.getTags().toString());
-                applyAiAuditResult(post, auditResult);
-            }
+            applyPublishAudit(post, activeUser);
 
             boolean success = postService.publishPost(post);
             result.put("success", success);
@@ -162,16 +163,7 @@ public class PostServlet extends HttpServlet {
             post.setIsPinned(0);
             post.setIsDeleted(0);
 
-            boolean adminPost = activeUser.getRole() != null && activeUser.getRole() == 2;
-            if (adminPost) {
-                post.setAuditStatus(1);
-                post.setAuditReason(null);
-                post.setAuditedBy(activeUser.getUsername());
-                post.setAuditedAt(new Date());
-            } else {
-                AiAuditResult auditResult = aiGatewayService.auditPost(post.getTitle(), post.getBody(), post.getTags() == null ? "" : post.getTags().toString());
-                applyAiAuditResult(post, auditResult);
-            }
+            applyPublishAudit(post, activeUser);
 
             boolean success = postService.resubmitPost(post);
             result.put("success", success);
@@ -211,6 +203,41 @@ public class PostServlet extends HttpServlet {
                 result.put("likes", updatedPost == null ? 0 : updatedPost.getLikes());
                 result.put("hugs", updatedPost == null ? 0 : updatedPost.getHugs());
                 result.put("reports", updatedPost == null ? 0 : updatedPost.getReports());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "操作失败");
+        }
+        writeJson(response, result);
+    }
+
+    private void actionReply(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        TreeholeUser user = currentUser(request);
+        if (user == null) {
+            writeJson(response, fail("请先登录后再操作"));
+            return;
+        }
+        TreeholeUser activeUser = activeUser(user);
+        if (activeUser == null) {
+            writeJson(response, fail("账号已被封禁，无法操作"));
+            return;
+        }
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String json = readBody(request);
+            Map<String, String> map = JSON.parseObject(json, Map.class);
+            String replyId = map == null ? null : map.get("replyId");
+            String action = map == null ? null : map.get("action");
+            boolean success = postService.actionReply(replyId, action, activeUser.getUsername());
+            result.put("success", success);
+            result.put("message", success ? "操作成功" : "操作失败");
+            if (success) {
+                Reply updatedReply = findReply(replyId);
+                result.put("active", actionActive(updatedReply, action, activeUser.getUsername()));
+                result.put("likes", updatedReply == null ? 0 : updatedReply.getLikes());
+                result.put("hugs", updatedReply == null ? 0 : updatedReply.getHugs());
+                result.put("reports", updatedReply == null ? 0 : updatedReply.getReports());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -280,6 +307,26 @@ public class PostServlet extends HttpServlet {
         post.setAuditedAt(auditResult.getStatus() == 0 ? null : new Date());
     }
 
+    private void applyPublishAudit(Post post, TreeholeUser user) {
+        if (post == null) return;
+        if (user != null && user.getRole() != null && user.getRole() == 2) {
+            post.setAuditStatus(1);
+            post.setAuditReason("管理员发布免审核");
+            post.setAuditedBy(user.getUsername());
+            post.setAuditedAt(new Date());
+            return;
+        }
+        if (post.getMedia() != null && !post.getMedia().isEmpty()) {
+            post.setAuditStatus(0);
+            post.setAuditReason("包含图片或视频，等待管理员人工审核");
+            post.setAuditedBy(null);
+            post.setAuditedAt(null);
+            return;
+        }
+        AiAuditResult auditResult = aiGatewayService.auditPost(post.getTitle(), post.getBody(), post.getTags() == null ? "" : post.getTags().toString());
+        applyAiAuditResult(post, auditResult);
+    }
+
     private String publishMessage(Post post) {
         if (post == null || post.getAuditStatus() == null) return "发布成功，等待审核";
         if (post.getAuditStatus() == 1) return "发布成功，AI审核已通过，已显示在广场";
@@ -314,6 +361,40 @@ public class PostServlet extends HttpServlet {
         if ("hug".equals(action)) return post.getHuggedBy() != null && post.getHuggedBy().contains(username);
         if ("report".equals(action)) return post.getReportedBy() != null && post.getReportedBy().contains(username);
         return false;
+    }
+
+    private boolean actionActive(Reply reply, String action, String username) {
+        if (reply == null || username == null) return false;
+        if ("like".equals(action)) return reply.getLikedBy() != null && reply.getLikedBy().contains(username);
+        if ("hug".equals(action)) return reply.getHuggedBy() != null && reply.getHuggedBy().contains(username);
+        if ("report".equals(action)) return reply.getReportedBy() != null && reply.getReportedBy().contains(username);
+        return false;
+    }
+
+    private Reply findReply(String replyId) {
+        if (replyId == null || replyId.trim().isEmpty()) return null;
+        List<Post> posts = postService.getAllPosts();
+        for (Post post : posts) {
+            if (post == null || post.getReplies() == null) continue;
+            for (Reply reply : post.getReplies()) {
+                if (reply != null && replyId.equals(reply.getId())) return reply;
+            }
+        }
+        return null;
+    }
+
+    private List<Post> publicPostsByAuthor(String username) {
+        List<Post> publicPosts = new ArrayList<>();
+        if (username == null || username.trim().isEmpty()) return publicPosts;
+        TreeholeUser author = authDao.getUserByUsername(username.trim());
+        if (author == null || author.getProfilePublic() != null && author.getProfilePublic() == 0) return publicPosts;
+        List<Post> posts = postService.getPostsByAuthor(username.trim());
+        for (Post post : posts) {
+            if (post != null && post.getAuditStatus() != null && post.getAuditStatus() == 1) {
+                publicPosts.add(post);
+            }
+        }
+        return publicPosts;
     }
 
     private List<Map<String, String>> normalizeMedia(List<Map<String, String>> media) {

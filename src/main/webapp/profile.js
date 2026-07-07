@@ -8,6 +8,7 @@
     posts: [],
     interactedPosts: [],
     activeTab: "mine",
+    viewedUsername: new URLSearchParams(location.search).get("user") || "",
   };
 
   const dom = {
@@ -23,6 +24,8 @@
     avatarInput: document.getElementById("profileAvatarInput"),
     accountMeta: document.getElementById("profileAccountMeta"),
     accountList: document.getElementById("profileAccountList"),
+    privacySetting: document.getElementById("profilePrivacySetting"),
+    profilePublicToggle: document.getElementById("profilePublicToggle"),
     scoreboard: document.getElementById("profileScoreboard"),
     posts: document.getElementById("profilePosts"),
     tabButtons: Array.from(document.querySelectorAll("[data-profile-tab]")),
@@ -32,6 +35,13 @@
   init();
 
   function init() {
+    const target = new URLSearchParams(location.search).get("user");
+    if (target) {
+      state.viewedUsername = target.trim();
+      sessionStorage.setItem("campus-treehole-profile-target", state.viewedUsername);
+    } else {
+      sessionStorage.removeItem("campus-treehole-profile-target");
+    }
     bindEvents();
     syncCurrentUser();
   }
@@ -45,6 +55,7 @@
     if (dom.avatar) dom.avatar.addEventListener("click", pickAvatar);
     if (dom.avatarBtn) dom.avatarBtn.addEventListener("click", pickAvatar);
     if (dom.avatarInput) dom.avatarInput.addEventListener("change", handleAvatarChange);
+    if (dom.profilePublicToggle) dom.profilePublicToggle.addEventListener("click", toggleProfilePublic);
     if (dom.posts) dom.posts.addEventListener("click", handlePostListClick);
     dom.tabButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -66,9 +77,14 @@
         }
         loginUser = data.user;
         localStorage.setItem("loginUser", JSON.stringify(data.user));
-        renderUserHeader();
-        loadMinePosts();
-        loadInteractedPosts();
+        if (isViewingPublicProfile()) {
+          renderPublicHeader(state.viewedUsername);
+          loadAuthorPosts(state.viewedUsername);
+        } else {
+          renderUserHeader();
+          loadMinePosts();
+          loadInteractedPosts();
+        }
       })
       .catch(() => {
         showToast("登录状态读取失败，请重新登录。");
@@ -101,6 +117,38 @@
       });
   }
 
+  function loadAuthorPosts(username) {
+    dom.tabButtons.forEach((button) => {
+      button.classList.toggle("active", button.dataset.profileTab === "mine");
+      if (button.dataset.profileTab === "interacted") button.style.display = "none";
+    });
+    state.activeTab = "mine";
+    dom.posts.innerHTML = `<div class="profile-empty">正在读取公开主页…</div>`;
+    fetch(api(`/api/posts/author?username=${encodeURIComponent(username)}`), { credentials: "same-origin" })
+      .then((res) => res.json())
+      .then((data) => {
+        state.posts = normalizePosts(Array.isArray(data) ? data : []);
+        renderPublicHeader(username);
+        render();
+      })
+      .catch(() => {
+        dom.posts.innerHTML = `<div class="profile-empty">公开主页读取失败，请稍后再试。</div>`;
+      });
+  }
+
+  function isViewingPublicProfile() {
+    return !!state.viewedUsername;
+  }
+
+  function renderPublicHeader(username) {
+    if (dom.userText) dom.userText.textContent = `主页：${username}`;
+    if (dom.adminAuditLink) dom.adminAuditLink.style.display = Number(loginUser.role) === 2 ? "inline-flex" : "none";
+    if (dom.accountMeta) dom.accountMeta.textContent = `@${username} · 公开主页`;
+    if (dom.privacySetting) dom.privacySetting.style.display = "none";
+    if (dom.avatarBtn) dom.avatarBtn.style.display = "none";
+    if (dom.avatar) dom.avatar.textContent = username.slice(0, 1).toUpperCase();
+  }
+
   function renderUserHeader() {
     const roleName = Number(loginUser.role) === 2 ? "管理员" : "普通用户";
     dom.userText.textContent = `${roleName}：${loginUser.username}`;
@@ -109,6 +157,7 @@
       dom.accountMeta.textContent = `${loginUser.nickname || loginUser.username} · @${loginUser.username} · ${roleName}`;
     }
     if (dom.adminAuditLink) dom.adminAuditLink.style.display = Number(loginUser.role) === 2 ? "inline-flex" : "none";
+    renderPrivacySetting();
   }
 
   function render() {
@@ -133,6 +182,17 @@
 
   function renderAccount() {
     if (!dom.accountList) return;
+    if (isViewingPublicProfile()) {
+      const accountItems = [
+        ["用户名", `@${state.viewedUsername}`],
+        ["身份", "公开主页"],
+        ["发布", `${state.posts.length}`],
+      ];
+      dom.accountList.innerHTML = accountItems
+        .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
+        .join("");
+      return;
+    }
     const accountItems = [
       ["用户名", `@${loginUser.username}`],
       ["昵称", loginUser.nickname || "未设置"],
@@ -280,6 +340,43 @@
     }
   }
 
+  function isProfilePublic() {
+    return !loginUser || loginUser.profilePublic === undefined || Number(loginUser.profilePublic) !== 0;
+  }
+
+  function renderPrivacySetting() {
+    if (!dom.privacySetting || !dom.profilePublicToggle) return;
+    dom.privacySetting.style.display = isViewingPublicProfile() ? "none" : "flex";
+    const enabled = isProfilePublic();
+    dom.profilePublicToggle.classList.toggle("is-off", !enabled);
+    dom.profilePublicToggle.textContent = enabled ? "已公开" : "不公开";
+    dom.profilePublicToggle.setAttribute("aria-pressed", String(enabled));
+  }
+
+  function toggleProfilePublic() {
+    if (!loginUser || isViewingPublicProfile()) return;
+    const nextValue = isProfilePublic() ? 0 : 1;
+    fetch(api("/auth/profile-visibility"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: JSON.stringify({ profilePublic: nextValue }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success) {
+          showToast(data.message || "个人主页设置更新失败");
+          return;
+        }
+        loginUser = data.user || { ...loginUser, profilePublic: nextValue };
+        localStorage.setItem("loginUser", JSON.stringify(loginUser));
+        renderUserHeader();
+        renderAccount();
+        showToast(data.message || "个人主页设置已更新");
+      })
+      .catch(() => showToast("网络错误，请稍后再试"));
+  }
+
   function pickAvatar() {
     if (dom.avatarInput) dom.avatarInput.click();
   }
@@ -329,6 +426,7 @@
   }
 
   function handlePostListClick(event) {
+    if (isViewingPublicProfile()) return;
     const button = event.target.closest("[data-edit-post]");
     if (!button) return;
     const post = state.posts.find((item) => item.id === button.dataset.editPost);

@@ -7,17 +7,39 @@
     <title>校屿树洞 · 管理员审核台</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem("campus-treehole-theme-v1");
+        document.documentElement.dataset.theme = savedTheme === "nature" ? "nature" : "blue";
+        if (savedTheme === "nature") {
+          document.documentElement.classList.add("theme-nature");
+        }
+      })();
+    </script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-image-corrected.css?v=20260701-profile-ai" />
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-image-corrected.css?v=20260702-mute-modal" />
+    <link id="blueHourThemeStyles" rel="stylesheet" href="${pageContext.request.contextPath}/styles-blue-hour-premium.css?v=20260701-blue-hour-premium" />
+    <link id="natureThemeStyles" rel="stylesheet" href="${pageContext.request.contextPath}/styles-nature-distilled.css?v=20260701-nature-distilled" />
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem("campus-treehole-theme-v1");
+        if (savedTheme !== "bluehour") {
+          document.getElementById("blueHourThemeStyles").disabled = true;
+        }
+        if (savedTheme !== "nature") {
+          document.getElementById("natureThemeStyles").disabled = true;
+        }
+      })();
+    </script>
   </head>
   <body>
     <div class="app-shell admin-shell">
       <header class="topbar">
         <div class="topbar-row topbar-row--top">
-          <a class="brand" href="${pageContext.request.contextPath}/index.jsp" aria-label="返回校屿树洞首页">
+          <a class="brand" href="${pageContext.request.contextPath}/plaza.jsp" aria-label="返回校屿树洞广场">
             <span class="brand-mark" aria-hidden="true">◇</span>
             <span class="brand-text">
               <span class="brand-kicker">CAMPUS WHISPER · REVIEW DESK</span>
@@ -27,7 +49,7 @@
 
           <div class="user-actions" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
             <span id="adminUserText" style="font-size: 14px; font-weight: 500; color: var(--ink-soft);">正在验证权限…</span>
-            <a class="auth-btn ghost" href="${pageContext.request.contextPath}/index.jsp">返回广场</a>
+            <a class="auth-btn ghost" href="${pageContext.request.contextPath}/plaza.jsp">返回广场</a>
             <a class="auth-btn ghost" href="${pageContext.request.contextPath}/profile.jsp">个人空间</a>
             <button class="auth-btn admin" id="adminRefreshBtn" type="button">刷新队列</button>
             <button class="auth-btn ghost" id="adminLogoutBtn" type="button">退出登录</button>
@@ -71,6 +93,7 @@
               <button class="filter active" type="button" data-tab="posts">树洞审核</button>
               <button class="filter" type="button" data-tab="replies">评论审核</button>
               <button class="filter" type="button" data-tab="users">用户管理</button>
+              <button class="filter" type="button" data-tab="listeners">倾听者审核</button>
               <button class="filter ai-audit-trigger" id="aiAuditRepliesBtn" type="button">AI审核待审评论</button>
             </div>
 
@@ -88,8 +111,32 @@
           <div class="audit-list" id="postAuditList" aria-live="polite"></div>
           <div class="audit-list" id="replyAuditList" aria-live="polite" style="display:none;"></div>
           <div class="audit-list user-audit-list" id="userAuditList" aria-live="polite" style="display:none;"></div>
+          <div class="audit-list listener-audit-list" id="listenerAuditList" aria-live="polite" style="display:none;"></div>
         </section>
       </main>
+    </div>
+
+    <div class="auth-modal" id="muteModal" aria-hidden="true">
+      <div class="auth-card mute-dialog" role="dialog" aria-modal="true" aria-labelledby="muteModalTitle">
+        <button class="modal-close" id="muteModalClose" type="button" aria-label="关闭">×</button>
+        <p class="eyebrow">MUTE USER</p>
+        <h2 id="muteModalTitle">设置禁言时长</h2>
+        <p class="soft-text">选择一个禁言期限，也可以输入自定义分钟数。设为永久时不会自动解除。</p>
+        <div class="mute-options" aria-label="禁言快捷时长">
+          <button class="filter active" type="button" data-mute-minutes="30">30 分钟</button>
+          <button class="filter" type="button" data-mute-minutes="120">2 小时</button>
+          <button class="filter" type="button" data-mute-minutes="1440">24 小时</button>
+          <button class="filter" type="button" data-mute-minutes="0">永久</button>
+        </div>
+        <label class="mute-custom">
+          <span>自定义分钟数</span>
+          <input id="muteCustomMinutes" type="number" min="0" step="1" placeholder="例如 90" />
+        </label>
+        <div class="mute-dialog-actions">
+          <button class="auth-btn ghost" id="muteModalCancel" type="button">取消</button>
+          <button class="primary-btn" id="muteModalConfirm" type="button">确认禁言</button>
+        </div>
+      </div>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -97,6 +144,6 @@
     <script>
       window.CONTEXT_PATH = "${pageContext.request.contextPath}";
     </script>
-    <script src="${pageContext.request.contextPath}/admin-audit.js?v=20260701-profile-ai"></script>
+    <script src="${pageContext.request.contextPath}/admin-audit.js?v=20260702-mute-modal"></script>
   </body>
 </html>

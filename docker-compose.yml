@@ -1,0 +1,40 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: treehole
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-treehole123456}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./treehole.sql:/docker-entrypoint-initdb.d/01-treehole.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-treehole123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      JDBC_DRIVER: com.mysql.cj.jdbc.Driver
+      JDBC_URL: jdbc:mysql://mysql:3306/treehole?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      JDBC_USERNAME: root
+      JDBC_PASSWORD: ${MYSQL_ROOT_PASSWORD:-treehole123456}
+      AI_AUDIT_ENABLED: ${AI_AUDIT_ENABLED:-true}
+      AI_AUDIT_API_URL: ${AI_AUDIT_API_URL:-}
+      AI_AUDIT_API_KEY: ${AI_AUDIT_API_KEY:-}
+      AI_AUDIT_MODEL: ${AI_AUDIT_MODEL:-gemini-3-flash}
+
+volumes:
+  mysql-data:

@@ -12,8 +12,10 @@ public class DBUtil {
 
     static {
         try (InputStream in = DBUtil.class.getClassLoader().getResourceAsStream("db.properties")) {
-            properties.load(in);
-            Class.forName(properties.getProperty("jdbc.driver"));
+            if (in != null) {
+                properties.load(in);
+            }
+            Class.forName(getConfig("JDBC_DRIVER", "jdbc.driver", "com.mysql.cj.jdbc.Driver"));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -22,14 +24,26 @@ public class DBUtil {
     public static Connection getConnection() {
         try {
             return DriverManager.getConnection(
-                    properties.getProperty("jdbc.url"),
-                    properties.getProperty("jdbc.username"),
-                    properties.getProperty("jdbc.password")
+                    getConfig("JDBC_URL", "jdbc.url", ""),
+                    getConfig("JDBC_USERNAME", "jdbc.username", ""),
+                    getConfig("JDBC_PASSWORD", "jdbc.password", "")
             );
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private static String getConfig(String envKey, String propertyKey, String defaultValue) {
+        String envValue = System.getenv(envKey);
+        if (envValue != null && !envValue.trim().isEmpty()) {
+            return envValue.trim();
+        }
+        String propertyValue = properties.getProperty(propertyKey);
+        if (propertyValue != null && !propertyValue.trim().isEmpty()) {
+            return propertyValue.trim();
+        }
+        return defaultValue;
     }
 
     public static void close(Connection conn, PreparedStatement pstmt, ResultSet rs) {

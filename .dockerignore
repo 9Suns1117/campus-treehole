@@ -1,0 +1,8 @@
+target/
+.git/
+.agents/
+.codex/
+*.log
+node_modules/
+Dockerfile
+docker-compose*.yml

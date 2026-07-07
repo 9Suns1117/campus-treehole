@@ -14,6 +14,7 @@ public interface PostService {
     boolean resubmitPost(Post post);
     boolean actionPost(String postId, String action, String username);
     boolean addReply(Reply reply);
+    boolean actionReply(String replyId, String action, String username);
 
     /** 对单条待审评论调用AI审核。 */
     boolean aiAuditReply(String id, String auditedBy);

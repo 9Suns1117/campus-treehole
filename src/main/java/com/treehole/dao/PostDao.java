@@ -28,6 +28,7 @@ public class PostDao {
             conn = DBUtil.getConnection();
             if (conn == null) return posts;
             boolean hasPinColumn = ensurePostPinColumn(conn);
+            ensureReplyInteractionColumns(conn);
             String sql = "SELECT * FROM post WHERE is_deleted = 0 AND audit_status = 1 ORDER BY " + (hasPinColumn ? "is_pinned DESC, " : "") + "created_at DESC";
             pstmt = conn.prepareStatement(sql);
             rs = pstmt.executeQuery();
@@ -54,6 +55,7 @@ public class PostDao {
         ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
+            ensureReplyInteractionColumns(conn);
             String sql = "SELECT * FROM post WHERE is_deleted = 0 AND author_username = ? ORDER BY created_at DESC";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, username);
@@ -83,6 +85,7 @@ public class PostDao {
             conn = DBUtil.getConnection();
             if (conn == null) return posts;
             boolean hasPinColumn = ensurePostPinColumn(conn);
+            ensureReplyInteractionColumns(conn);
             String sql = "SELECT * FROM post WHERE is_deleted = 0 AND audit_status = 1 ORDER BY " + (hasPinColumn ? "is_pinned DESC, " : "") + "created_at DESC";
             pstmt = conn.prepareStatement(sql);
             rs = pstmt.executeQuery();
@@ -113,6 +116,7 @@ public class PostDao {
             conn = DBUtil.getConnection();
             if (conn == null) return posts;
             boolean hasPinColumn = ensurePostPinColumn(conn);
+            ensureReplyInteractionColumns(conn);
             String sql = "SELECT * FROM post WHERE is_deleted = 0" + (status == null ? "" : " AND audit_status = ?") + " ORDER BY " + (hasPinColumn ? "is_pinned DESC, " : "") + "created_at DESC";
             pstmt = conn.prepareStatement(sql);
             if (status != null) pstmt.setInt(1, status);
@@ -136,6 +140,7 @@ public class PostDao {
         ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
+            ensureReplyInteractionColumns(conn);
             String sql = "SELECT * FROM post WHERE id = ? AND is_deleted = 0";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, id);
@@ -158,8 +163,10 @@ public class PostDao {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
-            String sql = "SELECT r.*, p.title AS post_title, p.category AS post_category FROM reply r " +
+            ensureReplyInteractionColumns(conn);
+            String sql = "SELECT r.*, p.title AS post_title, p.category AS post_category, parent.alias AS parent_alias FROM reply r " +
                     "LEFT JOIN post p ON r.post_id = p.id " +
+                    "LEFT JOIN reply parent ON r.parent_reply_id = parent.id " +
                     "WHERE r.post_id = ? AND r.is_deleted = 0" +
                     (includeAllAuditStatus ? "" : " AND r.audit_status = 1") +
                     " ORDER BY r.created_at ASC";
@@ -189,8 +196,10 @@ public class PostDao {
         ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
-            String sql = "SELECT r.*, p.title AS post_title, p.category AS post_category FROM reply r " +
+            ensureReplyInteractionColumns(conn);
+            String sql = "SELECT r.*, p.title AS post_title, p.category AS post_category, parent.alias AS parent_alias FROM reply r " +
                     "LEFT JOIN post p ON r.post_id = p.id " +
+                    "LEFT JOIN reply parent ON r.parent_reply_id = parent.id " +
                     "WHERE r.is_deleted = 0" +
                     (status == null ? "" : " AND r.audit_status = ?") +
                     " ORDER BY r.created_at DESC";
@@ -214,8 +223,10 @@ public class PostDao {
         ResultSet rs = null;
         try {
             conn = DBUtil.getConnection();
-            String sql = "SELECT r.*, p.title AS post_title, p.category AS post_category FROM reply r " +
+            ensureReplyInteractionColumns(conn);
+            String sql = "SELECT r.*, p.title AS post_title, p.category AS post_category, parent.alias AS parent_alias FROM reply r " +
                     "LEFT JOIN post p ON r.post_id = p.id " +
+                    "LEFT JOIN reply parent ON r.parent_reply_id = parent.id " +
                     "WHERE r.id = ? AND r.is_deleted = 0";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, id);
@@ -262,10 +273,17 @@ public class PostDao {
         Reply reply = new Reply();
         reply.setId(rs.getString("id"));
         reply.setPostId(rs.getString("post_id"));
+        reply.setParentReplyId(getStringIfExists(rs, "parent_reply_id"));
         reply.setBody(rs.getString("body"));
         reply.setCreatedAt(rs.getTimestamp("created_at"));
         reply.setAuthorUsername(rs.getString("author_username"));
         reply.setAlias(rs.getString("alias"));
+        reply.setLikes(getIntIfExists(rs, "likes", 0));
+        reply.setLikedBy(parseStringList(getStringIfExists(rs, "liked_by")));
+        reply.setHugs(getIntIfExists(rs, "hugs", 0));
+        reply.setHuggedBy(parseStringList(getStringIfExists(rs, "hugged_by")));
+        reply.setReports(getIntIfExists(rs, "reports", 0));
+        reply.setReportedBy(parseStringList(getStringIfExists(rs, "reported_by")));
         reply.setAuditStatus(rs.getInt("audit_status"));
         reply.setAuditReason(rs.getString("audit_reason"));
         reply.setAuditedBy(rs.getString("audited_by"));
@@ -273,6 +291,7 @@ public class PostDao {
         reply.setIsDeleted(rs.getInt("is_deleted"));
         reply.setPostTitle(getStringIfExists(rs, "post_title"));
         reply.setPostCategory(getStringIfExists(rs, "post_category"));
+        reply.setParentAlias(getStringIfExists(rs, "parent_alias"));
         return reply;
     }
 
@@ -505,6 +524,32 @@ public class PostDao {
         }
     }
 
+    private void ensureReplyInteractionColumns(Connection conn) {
+        if (conn == null) return;
+        ensureColumn(conn, "reply", "parent_reply_id", "VARCHAR(50)");
+        ensureColumn(conn, "reply", "likes", "INT DEFAULT 0");
+        ensureColumn(conn, "reply", "liked_by", "JSON");
+        ensureColumn(conn, "reply", "hugs", "INT DEFAULT 0");
+        ensureColumn(conn, "reply", "hugged_by", "JSON");
+        ensureColumn(conn, "reply", "reports", "INT DEFAULT 0");
+        ensureColumn(conn, "reply", "reported_by", "JSON");
+    }
+
+    private void ensureColumn(Connection conn, String tableName, String columnName, String definition) {
+        if (hasColumn(conn, tableName, columnName)) return;
+        Statement stmt = null;
+        try {
+            stmt = conn.createStatement();
+            stmt.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
+        } catch (SQLException e) {
+            if (!isDuplicateColumnError(e)) {
+                e.printStackTrace();
+            }
+        } finally {
+            closeStatement(stmt);
+        }
+    }
+
     private boolean hasColumn(Connection conn, String tableName, String columnName) {
         ResultSet rs = null;
         try {
@@ -589,31 +634,67 @@ public class PostDao {
         PreparedStatement pstmt = null;
         try {
             conn = DBUtil.getConnection();
-            String sql = "INSERT INTO reply (id, post_id, body, created_at, author_username, alias, audit_status, audit_reason, audited_by, audited_at, is_deleted) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+            ensureReplyInteractionColumns(conn);
+            String sql = "INSERT INTO reply (id, post_id, parent_reply_id, body, created_at, author_username, alias, likes, liked_by, hugs, hugged_by, reports, reported_by, audit_status, audit_reason, audited_by, audited_at, is_deleted) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, reply.getId());
             pstmt.setString(2, reply.getPostId());
-            pstmt.setString(3, reply.getBody());
-            pstmt.setTimestamp(4, new java.sql.Timestamp(reply.getCreatedAt().getTime()));
-            pstmt.setString(5, reply.getAuthorUsername());
-            pstmt.setString(6, reply.getAlias());
-            pstmt.setInt(7, reply.getAuditStatus() == null ? 0 : reply.getAuditStatus());
-            if (reply.getAuditReason() == null || reply.getAuditReason().trim().isEmpty()) {
-                pstmt.setNull(8, Types.VARCHAR);
+            if (reply.getParentReplyId() == null || reply.getParentReplyId().trim().isEmpty()) {
+                pstmt.setNull(3, Types.VARCHAR);
             } else {
-                pstmt.setString(8, reply.getAuditReason().trim());
+                pstmt.setString(3, reply.getParentReplyId().trim());
+            }
+            pstmt.setString(4, reply.getBody());
+            pstmt.setTimestamp(5, new java.sql.Timestamp(reply.getCreatedAt().getTime()));
+            pstmt.setString(6, reply.getAuthorUsername());
+            pstmt.setString(7, reply.getAlias());
+            pstmt.setInt(8, reply.getLikes() == null ? 0 : reply.getLikes());
+            pstmt.setString(9, JSON.toJSONString(reply.getLikedBy() == null ? new ArrayList<>() : reply.getLikedBy()));
+            pstmt.setInt(10, reply.getHugs() == null ? 0 : reply.getHugs());
+            pstmt.setString(11, JSON.toJSONString(reply.getHuggedBy() == null ? new ArrayList<>() : reply.getHuggedBy()));
+            pstmt.setInt(12, reply.getReports() == null ? 0 : reply.getReports());
+            pstmt.setString(13, JSON.toJSONString(reply.getReportedBy() == null ? new ArrayList<>() : reply.getReportedBy()));
+            pstmt.setInt(14, reply.getAuditStatus() == null ? 0 : reply.getAuditStatus());
+            if (reply.getAuditReason() == null || reply.getAuditReason().trim().isEmpty()) {
+                pstmt.setNull(15, Types.VARCHAR);
+            } else {
+                pstmt.setString(15, reply.getAuditReason().trim());
             }
             if (reply.getAuditedBy() == null || reply.getAuditedBy().trim().isEmpty()) {
-                pstmt.setNull(9, Types.VARCHAR);
+                pstmt.setNull(16, Types.VARCHAR);
             } else {
-                pstmt.setString(9, reply.getAuditedBy().trim());
+                pstmt.setString(16, reply.getAuditedBy().trim());
             }
             if (reply.getAuditedAt() == null) {
-                pstmt.setNull(10, Types.TIMESTAMP);
+                pstmt.setNull(17, Types.TIMESTAMP);
             } else {
-                pstmt.setTimestamp(10, new java.sql.Timestamp(reply.getAuditedAt().getTime()));
+                pstmt.setTimestamp(17, new java.sql.Timestamp(reply.getAuditedAt().getTime()));
             }
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            DBUtil.close(conn, pstmt, null);
+        }
+    }
+
+    public boolean updateReplyStats(Reply reply) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            ensureReplyInteractionColumns(conn);
+            String sql = "UPDATE reply SET likes = ?, liked_by = ?, hugs = ?, hugged_by = ?, reports = ?, reported_by = ? WHERE id = ? AND is_deleted = 0";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, reply.getLikes() == null ? 0 : reply.getLikes());
+            pstmt.setString(2, JSON.toJSONString(reply.getLikedBy() == null ? new ArrayList<>() : reply.getLikedBy()));
+            pstmt.setInt(3, reply.getHugs() == null ? 0 : reply.getHugs());
+            pstmt.setString(4, JSON.toJSONString(reply.getHuggedBy() == null ? new ArrayList<>() : reply.getHuggedBy()));
+            pstmt.setInt(5, reply.getReports() == null ? 0 : reply.getReports());
+            pstmt.setString(6, JSON.toJSONString(reply.getReportedBy() == null ? new ArrayList<>() : reply.getReportedBy()));
+            pstmt.setString(7, reply.getId());
             return pstmt.executeUpdate() > 0;
         } catch (Exception e) {
             e.printStackTrace();
@@ -656,19 +737,47 @@ public class PostDao {
     }
 
     public boolean deletePost(String id) {
-        return logicalDelete("post", id);
+        if (id == null || id.trim().isEmpty()) return false;
+        Connection conn = null;
+        PreparedStatement deleteReplies = null;
+        PreparedStatement deletePost = null;
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) return false;
+            conn.setAutoCommit(false);
+            deleteReplies = conn.prepareStatement("DELETE FROM reply WHERE post_id = ?");
+            deleteReplies.setString(1, id);
+            deleteReplies.executeUpdate();
+            deletePost = conn.prepareStatement("DELETE FROM post WHERE id = ?");
+            deletePost.setString(1, id);
+            boolean success = deletePost.executeUpdate() > 0;
+            conn.commit();
+            return success;
+        } catch (Exception e) {
+            try {
+                if (conn != null) conn.rollback();
+            } catch (SQLException rollbackException) {
+                rollbackException.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            try {
+                if (conn != null) conn.setAutoCommit(true);
+            } catch (SQLException ignored) {
+            }
+            DBUtil.close(null, deleteReplies, null);
+            DBUtil.close(conn, deletePost, null);
+        }
     }
 
     public boolean deleteReply(String id) {
-        return logicalDelete("reply", id);
-    }
-
-    private boolean logicalDelete(String tableName, String id) {
+        if (id == null || id.trim().isEmpty()) return false;
         Connection conn = null;
         PreparedStatement pstmt = null;
         try {
             conn = DBUtil.getConnection();
-            String sql = "UPDATE " + tableName + " SET is_deleted = 1 WHERE id = ?";
+            String sql = "DELETE FROM reply WHERE id = ?";
             pstmt = conn.prepareStatement(sql);
             pstmt.setString(1, id);
             return pstmt.executeUpdate() > 0;

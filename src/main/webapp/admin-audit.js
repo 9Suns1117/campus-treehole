@@ -6,9 +6,12 @@
     posts: [],
     replies: [],
     users: [],
+    listeners: [],
     activeTab: "posts",
     status: "0",
     query: "",
+    pendingMuteUserId: null,
+    muteMinutes: 30,
   };
 
   const dom = {
@@ -28,6 +31,13 @@
     postList: document.getElementById("postAuditList"),
     replyList: document.getElementById("replyAuditList"),
     userList: document.getElementById("userAuditList"),
+    listenerList: document.getElementById("listenerAuditList"),
+    muteModal: document.getElementById("muteModal"),
+    muteModalClose: document.getElementById("muteModalClose"),
+    muteModalCancel: document.getElementById("muteModalCancel"),
+    muteModalConfirm: document.getElementById("muteModalConfirm"),
+    muteCustomMinutes: document.getElementById("muteCustomMinutes"),
+    muteOptionButtons: Array.from(document.querySelectorAll("[data-mute-minutes]")),
     toast: document.getElementById("toast"),
   };
 
@@ -72,6 +82,27 @@
     if (dom.postList) dom.postList.addEventListener("click", handleActionClick);
     if (dom.replyList) dom.replyList.addEventListener("click", handleActionClick);
     if (dom.userList) dom.userList.addEventListener("click", handleUserActionClick);
+    if (dom.listenerList) dom.listenerList.addEventListener("click", handleListenerAuditClick);
+    if (dom.muteModalClose) dom.muteModalClose.addEventListener("click", closeMuteModal);
+    if (dom.muteModalCancel) dom.muteModalCancel.addEventListener("click", closeMuteModal);
+    if (dom.muteModalConfirm) dom.muteModalConfirm.addEventListener("click", confirmMuteModal);
+    if (dom.muteModal) {
+      dom.muteModal.addEventListener("click", (event) => {
+        if (event.target === dom.muteModal) closeMuteModal();
+      });
+    }
+    dom.muteOptionButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.muteMinutes = Number(button.dataset.muteMinutes || 30);
+        if (dom.muteCustomMinutes) dom.muteCustomMinutes.value = "";
+        dom.muteOptionButtons.forEach((item) => item.classList.toggle("active", item === button));
+      });
+    });
+    if (dom.muteCustomMinutes) {
+      dom.muteCustomMinutes.addEventListener("input", () => {
+        dom.muteOptionButtons.forEach((item) => item.classList.remove("active"));
+      });
+    }
   }
 
   function checkAdmin() {
@@ -100,6 +131,7 @@
     if (dom.postList) dom.postList.innerHTML = loadingState("正在读取树洞审核队列...");
     if (dom.replyList) dom.replyList.innerHTML = loadingState("正在读取评论审核队列...");
     if (dom.userList) dom.userList.innerHTML = loadingState("正在读取用户列表...");
+    if (dom.listenerList) dom.listenerList.innerHTML = loadingState("正在读取倾听者申请...");
 
     Promise.all([
       fetch(api(`/api/admin/posts?status=${statusParam}`), { credentials: "same-origin" }).then((res) => res.json()),
@@ -107,8 +139,9 @@
       fetch(api("/api/admin/posts?status=all"), { credentials: "same-origin" }).then((res) => res.json()),
       fetch(api("/api/admin/replies?status=all"), { credentials: "same-origin" }).then((res) => res.json()),
       fetch(api("/api/admin/users"), { credentials: "same-origin" }).then((res) => res.json()).catch(() => ({ success: false, users: [] })),
+      fetch(api(`/api/admin/listeners?status=${statusParam}`), { credentials: "same-origin" }).then((res) => res.json()).catch(() => ({ success: false, listeners: [] })),
     ])
-      .then(([postData, replyData, allPostData, allReplyData, userData]) => {
+      .then(([postData, replyData, allPostData, allReplyData, userData, listenerData]) => {
         if (!postData.success || !replyData.success) {
           showToast(postData.message || replyData.message || "读取失败");
           return;
@@ -116,6 +149,7 @@
         state.posts = Array.isArray(postData.posts) ? postData.posts : [];
         state.replies = Array.isArray(replyData.replies) ? replyData.replies : [];
         state.users = Array.isArray(userData.users) ? userData.users : [];
+        state.listeners = Array.isArray(listenerData.listeners) ? listenerData.listeners : [];
         renderStats([...(allPostData.posts || []), ...(allReplyData.replies || [])], state.users);
         render();
       })
@@ -143,15 +177,18 @@
     const isPosts = state.activeTab === "posts";
     const isReplies = state.activeTab === "replies";
     const isUsers = state.activeTab === "users";
+    const isListeners = state.activeTab === "listeners";
     if (dom.postList) dom.postList.style.display = isPosts ? "grid" : "none";
     if (dom.replyList) dom.replyList.style.display = isReplies ? "grid" : "none";
     if (dom.userList) dom.userList.style.display = isUsers ? "grid" : "none";
+    if (dom.listenerList) dom.listenerList.style.display = isListeners ? "grid" : "none";
     if (dom.statusSelect) dom.statusSelect.closest(".sort-select").style.display = isUsers ? "none" : "inline-flex";
-    if (dom.aiAuditRepliesBtn) dom.aiAuditRepliesBtn.style.display = isUsers ? "none" : "inline-flex";
+    if (dom.aiAuditRepliesBtn) dom.aiAuditRepliesBtn.style.display = isUsers || isListeners ? "none" : "inline-flex";
     if (dom.heroCount) {
       const limited = state.users.filter((user) => Number(user.status) !== 1 || Number(user.muteStatus || 0) === 1).length;
       const pending = state.posts.concat(state.replies).filter((item) => Number(item.auditStatus) === 0).length;
-      dom.heroCount.textContent = isUsers ? limited : pending;
+      const listenerPending = state.listeners.filter((item) => Number(item.status) === 0).length;
+      dom.heroCount.textContent = isUsers ? limited : isListeners ? listenerPending : pending;
     }
 
     if (isPosts) {
@@ -160,9 +197,12 @@
     } else if (isReplies) {
       const replies = filterItems(state.replies, (reply) => [reply.body, reply.alias, reply.authorUsername, reply.postTitle, reply.postCategory]);
       dom.replyList.innerHTML = replies.length ? replies.map(renderReplyCard).join("") : emptyState("当前没有符合条件的评论。");
-    } else {
+    } else if (isUsers) {
     const users = filterItems(state.users, (user) => [user.username, user.nickname, roleText(user.role), userStatusText(user.status), disabledAwareMuteText(user), muteUntilText(user.muteUntil)]);
       dom.userList.innerHTML = users.length ? users.map(renderUserCard).join("") : emptyState("当前没有符合条件的用户。");
+    } else {
+      const listeners = filterItems(state.listeners, (item) => [item.username, item.nickname, item.reason, item.bio, item.topics, item.availableTime, listenerStatusText(item.status)]);
+      dom.listenerList.innerHTML = listeners.length ? listeners.map(renderListenerAuditCard).join("") : emptyState("当前没有符合条件的倾听者申请。");
     }
   }
 
@@ -248,6 +288,39 @@
           <button class="action-btn danger" type="button" data-user-action="status" data-next="${disabled ? "1" : "0"}" ${self ? "disabled" : ""}>${disabled ? "解除封号" : "封号"}</button>
           ${disabled ? "" : `<button class="action-btn ghost" type="button" data-user-action="mute" data-next="${muted ? "0" : "1"}" ${self ? "disabled" : ""}>${muted ? "解除禁言" : "禁言"}</button>`}
           <button class="action-btn ghost" type="button" data-user-action="delete" ${self ? "disabled" : ""}>删除用户</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderListenerAuditCard(item) {
+    const status = Number(item.status);
+    const statusClass = status === 1 ? "ok" : status === 2 ? "reject" : "pending";
+    return `
+      <article class="audit-card listener-audit-card" data-listener-id="${escapeHtml(item.id)}">
+        <div class="audit-card-head">
+          <div class="user-card-title">
+            <span class="profile-avatar small">${escapeHtml((item.nickname || item.username || "月").slice(0, 1))}</span>
+            <div>
+              <h3>${escapeHtml(item.nickname || item.username || "匿名同学")}</h3>
+              <p>@${escapeHtml(item.username || "-")} · 月光倾听者申请</p>
+            </div>
+          </div>
+          <span class="audit-status ${statusClass}">${escapeHtml(listenerStatusText(status))}</span>
+        </div>
+        <div class="user-admin-grid">
+          <span><b>${Number(item.listenCount || 0)}</b><i>已倾听</i></span>
+          <span><b>${Number(item.thanksCount || 0)}</b><i>感谢卡</i></span>
+          <span><b>${Number(item.warmth || 0)}</b><i>温柔值</i></span>
+        </div>
+        <p class="post-content"><strong>申请理由：</strong>${escapeHtml(item.reason || "未填写")}</p>
+        <p class="post-content"><strong>简介：</strong>${escapeHtml(item.bio || "未填写")}</p>
+        <div class="tag-row">${String(item.topics || "").split(/[\\s,，、]+/).filter(Boolean).map((tag) => `<span class="tag">#${escapeHtml(tag)}</span>`).join("")}</div>
+        <div class="audit-meta-line">可在线时间：${escapeHtml(item.availableTime || "未填写")}</div>
+        ${item.auditReason ? `<div class="audit-reason">审核说明：${escapeHtml(item.auditReason)}</div>` : ""}
+        <div class="audit-actions">
+          <button class="action-btn approve" type="button" data-listener-action="approve" ${status === 1 ? "disabled" : ""}>通过</button>
+          <button class="action-btn danger" type="button" data-listener-action="reject" ${status === 2 ? "disabled" : ""}>拒绝</button>
         </div>
       </article>
     `;
@@ -345,15 +418,28 @@
       requestAction("user", "status", { userId, status: next });
     } else if (button.dataset.userAction === "mute") {
       if (next === 1) {
-        const durationMinutes = askMuteDuration();
-        if (durationMinutes === null) return;
-        requestAction("user", "mute", { userId, muted: next, durationMinutes });
+        openMuteModal(userId);
       } else {
         requestAction("user", "mute", { userId, muted: next, durationMinutes: 0 });
       }
     } else if (button.dataset.userAction === "delete") {
       if (!confirm("确定删除这个用户吗？删除后该账号不能再登录。")) return;
       requestAction("user", "delete", { userId });
+    }
+  }
+
+  function handleListenerAuditClick(event) {
+    const button = event.target.closest("button[data-listener-action]");
+    if (!button || button.disabled) return;
+    const card = event.target.closest(".listener-audit-card");
+    if (!card) return;
+    const listenerId = Number(card.dataset.listenerId);
+    if (button.dataset.listenerAction === "approve") {
+      requestAction("listener", "audit", { listenerId, status: 1, reason: "" });
+    } else if (button.dataset.listenerAction === "reject") {
+      const reason = prompt("请输入拒绝原因（可为空）：", "暂不符合倾听者要求");
+      if (reason === null) return;
+      requestAction("listener", "audit", { listenerId, status: 2, reason });
     }
   }
 
@@ -371,6 +457,41 @@
       return null;
     }
     return Math.round(minutes);
+  }
+
+  function openMuteModal(userId) {
+    state.pendingMuteUserId = userId;
+    state.muteMinutes = 30;
+    if (dom.muteCustomMinutes) dom.muteCustomMinutes.value = "";
+    dom.muteOptionButtons.forEach((button) => {
+      button.classList.toggle("active", Number(button.dataset.muteMinutes || 0) === 30);
+    });
+    if (dom.muteModal) {
+      dom.muteModal.classList.add("show");
+      dom.muteModal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("modal-open");
+    }
+  }
+
+  function closeMuteModal() {
+    state.pendingMuteUserId = null;
+    if (dom.muteModal) {
+      dom.muteModal.classList.remove("show");
+      dom.muteModal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("modal-open");
+    }
+  }
+
+  function confirmMuteModal() {
+    if (!state.pendingMuteUserId) return;
+    const customValue = dom.muteCustomMinutes ? dom.muteCustomMinutes.value.trim() : "";
+    const durationMinutes = customValue ? Number(customValue) : Number(state.muteMinutes);
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 0) {
+      showToast("禁言时长格式不正确");
+      return;
+    }
+    requestAction("user", "mute", { userId: state.pendingMuteUserId, muted: 1, durationMinutes });
+    closeMuteModal();
   }
 
   function aiAuditPendingReplies() {
@@ -424,6 +545,13 @@
     if (status === 1) return { text: "已通过", className: "ok" };
     if (status === 2) return { text: "已驳回", className: "reject" };
     return { text: "待审核", className: "pending" };
+  }
+
+  function listenerStatusText(value) {
+    const status = Number(value);
+    if (status === 1) return "已通过";
+    if (status === 2) return "已拒绝";
+    return "待审核";
   }
 
   function roleText(value) {

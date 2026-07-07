@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 350" preserveAspectRatio="none" width="2400" height="350">
+  <defs>
+    <linearGradient id="gh1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2D6A4F;stop-opacity:0.20" />
+      <stop offset="40%" style="stop-color:#F5F0E1;stop-opacity:0.06" />
+      <stop offset="70%" style="stop-color:#D4C4A8;stop-opacity:0.08" />
+      <stop offset="100%" style="stop-color:#C67B5C;stop-opacity:0.18" />
+    </linearGradient>
+    <linearGradient id="gh2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#40916C;stop-opacity:0.20" />
+      <stop offset="100%" style="stop-color:#F5F0E1;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+  <rect width="2400" height="350" fill="url(#gh1)" />
+  <rect width="2400" height="350" fill="url(#gh2)" />
+  <!-- 叶子元素 -->
+  <g opacity="0.06" transform="translate(200, 30)">
+    <path d="M0,150 Q40,70 100,100 Q140,130 80,200 Q30,240 0,150Z" fill="#2D6A4F"/>
+    <path d="M160,50 Q190,0 240,30 Q270,60 220,110 Q180,140 160,50Z" fill="#2D6A4F"/>
+  </g>
+  <g opacity="0.05" transform="translate(900, 20)">
+    <path d="M0,180 Q50,100 120,130 Q160,160 100,240 Q40,280 0,180Z" fill="#40916C"/>
+  </g>
+  <g opacity="0.04" transform="translate(1700, 50)">
+    <path d="M0,120 Q40,50 100,70 Q140,90 80,160 Q30,190 0,120Z" fill="#6B7B3C"/>
+    <path d="M200,40 Q230,-10 280,20 Q310,50 260,100 Q220,130 200,40Z" fill="#6B7B3C"/>
+  </g>
+</svg>

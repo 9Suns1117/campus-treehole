@@ -43,6 +43,8 @@ public class AuthServlet extends HttpServlet {
             logout(request, response);
         } else if ("/avatar".equals(pathInfo)) {
             updateAvatar(request, response);
+        } else if ("/profile-visibility".equals(pathInfo)) {
+            updateProfileVisibility(request, response);
         } else {
             writeJson(response, fail("接口不存在"));
         }
@@ -146,6 +148,28 @@ public class AuthServlet extends HttpServlet {
         }
     }
 
+    private void updateProfileVisibility(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        TreeholeUser user = (TreeholeUser) request.getSession().getAttribute("loginUser");
+        if (user == null) {
+            writeJson(response, fail("请先登录后再修改个人主页设置"));
+            return;
+        }
+
+        Map<String, Object> body = JSON.parseObject(readBody(request), Map.class);
+        Object value = body == null ? null : body.get("profilePublic");
+        int profilePublic = Boolean.FALSE.equals(value) || "0".equals(String.valueOf(value)) || "false".equalsIgnoreCase(String.valueOf(value)) ? 0 : 1;
+        boolean success = authDao.updateProfilePublic(user.getUserId(), profilePublic);
+        if (success) {
+            user.setProfilePublic(profilePublic);
+            request.getSession(true).setAttribute("loginUser", user);
+            Map<String, Object> result = ok(profilePublic == 1 ? "个人主页已公开" : "个人主页已设为不公开");
+            result.put("user", safeUser(user));
+            writeJson(response, result);
+        } else {
+            writeJson(response, fail("个人主页设置更新失败"));
+        }
+    }
+
     private Integer parseRole(String roleText) {
         try {
             return Integer.parseInt(roleText);
@@ -175,6 +199,7 @@ public class AuthServlet extends HttpServlet {
         map.put("nickname", user.getNickname());
         map.put("role", user.getRole());
         map.put("avatarUrl", user.getAvatarUrl());
+        map.put("profilePublic", user.getProfilePublic() == null ? 1 : user.getProfilePublic());
         map.put("status", user.getStatus());
         map.put("muteStatus", user.getMuteStatus());
         map.put("muteUntil", user.getMuteUntil());

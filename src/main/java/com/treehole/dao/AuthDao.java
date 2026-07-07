@@ -210,6 +210,27 @@ public class AuthDao {
         }
     }
 
+    public boolean updateProfilePublic(Long userId, Integer profilePublic) {
+        if (userId == null) return false;
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            if (conn == null) return false;
+            ensureUserColumns(conn);
+            String sql = "UPDATE user SET profile_public = ? WHERE user_id = ? AND is_deleted = 0";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, profilePublic != null && profilePublic == 0 ? 0 : 1);
+            pstmt.setLong(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            DBUtil.close(conn, pstmt, null);
+        }
+    }
+
     public boolean deleteUser(Long userId) {
         if (userId == null) return false;
         Connection conn = null;
@@ -237,6 +258,7 @@ public class AuthDao {
         user.setNickname(rs.getString("nickname"));
         user.setRole(rs.getInt("role"));
         user.setAvatarUrl(rs.getString("avatar_url"));
+        user.setProfilePublic(getIntIfExists(rs, "profile_public", 1));
         user.setStatus(rs.getInt("status"));
         user.setMuteStatus(getIntIfExists(rs, "mute_status", 0));
         user.setMuteUntil(getTimestampIfExists(rs, "mute_until"));
@@ -273,6 +295,9 @@ public class AuthDao {
         }
         if (!hasColumn(conn, "user", "mute_until")) {
             addColumn(conn, "ALTER TABLE user ADD COLUMN mute_until DATETIME");
+        }
+        if (!hasColumn(conn, "user", "profile_public")) {
+            addColumn(conn, "ALTER TABLE user ADD COLUMN profile_public INT DEFAULT 1");
         }
     }
 
